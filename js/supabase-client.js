@@ -5,14 +5,14 @@
 const SUPABASE_URL = "https://nrciozyymgbmjdmocytv.supabase.co";
 const SUPABASE_KEY = "sb_publishable_5cyMRd3a69GfRc0whR2-8Q_D58YatQX";
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ============================================================
 // FUNCIONES DE ACCESO A DATOS - STOCK
 // ============================================================
 
 async function buscarStock({ texto = '', filtro = 'TODOS', limit = 50 } = {}) {
-  let query = supabase.from('stock').select('*');
+  let query = sb.from('stock').select('*');
 
   if (texto) {
     const t = texto.trim();
@@ -80,7 +80,7 @@ async function obtenerSugerencias(texto) {
 
 // Busca un SKU exacto y devuelve filas disponibles (para picking y nuevo despacho)
 async function buscarStockPorSKU(sku, soloDisponible = true) {
-  let query = supabase.from('stock').select('*').ilike('sku', sku.trim());
+  let query = sb.from('stock').select('*').ilike('sku', sku.trim());
   if (soloDisponible) query = query.eq('estado', 'DISPONIBLE').gt('cantidad', 0);
   query = query.order('cantidad', { ascending: false });
   const { data, error } = await query;
@@ -299,7 +299,7 @@ async function moverPaletaCompleta(paletaPedido, nuevaUbicacion, usuario = '') {
     observaciones: `Movimiento masivo: paleta/pedido ${paletaPedido}`
   }));
 
-  await supabase.from('kardex').insert(kardexRows);
+  await sb.from('kardex').insert(kardexRows);
 
   return { error: null, actualizados: items.length };
 }
@@ -328,7 +328,7 @@ async function registrarIngreso({ sku, descripcion, serie, cantidad, unidad_medi
 
   if (error) return { error };
 
-  await supabase.from('kardex').insert([{
+  await sb.from('kardex').insert([{
     stock_id: data.id,
     sku: data.sku,
     tipo_movimiento: 'INGRESO',
@@ -345,7 +345,7 @@ async function registrarIngreso({ sku, descripcion, serie, cantidad, unidad_medi
 // ============================================================
 
 async function obtenerKardex({ sku = '', limit = 50 } = {}) {
-  let query = supabase.from('kardex').select('*').order('fecha', { ascending: false }).limit(limit);
+  let query = sb.from('kardex').select('*').order('fecha', { ascending: false }).limit(limit);
   if (sku) query = query.ilike('sku', `%${sku}%`);
   const { data, error } = await query;
   if (error) return [];
