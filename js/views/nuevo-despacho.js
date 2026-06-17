@@ -1,9 +1,9 @@
 // ============================================================
-// VISTA: NUEVO DESPACHO
+// VISTA: NUEVA ORDEN DE PICKING
 // ============================================================
 
-const NuevoDespachoView = {
-  title: 'Nuevo despacho',
+const NuevoPickingView = {
+  title: 'Nueva orden de picking',
   _filas: [],
   _checkTimeout: null,
 
@@ -36,21 +36,33 @@ const NuevoDespachoView = {
             <label>Destino</label>
             <input type="text" id="f-destino" placeholder="Moyobamba" />
           </div>
-          <div class="field" style="grid-column: span 2;">
+          <div class="field">
             <label>Contrata</label>
             <input type="text" id="f-contrata" placeholder="Opcional" />
+          </div>
+          <div class="field" style="grid-column: span 2;">
+            <label>Consignatarios</label>
+            <input type="text" id="f-consignatarios" placeholder="Opcional" />
           </div>
         </div>
       </div>
 
       <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
           <p class="card-title" style="margin:0;">Ítems de la guía</p>
-          <button class="btn-text" id="btn-add-row">
-            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Agregar fila
-          </button>
+          <div style="display:flex; gap:14px;">
+            <button class="btn-text" id="btn-import-pdf">
+              <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              Importar PDF
+            </button>
+            <input type="file" id="input-pdf" accept="application/pdf" style="display:none;" />
+            <button class="btn-text" id="btn-add-row">
+              <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Agregar fila
+            </button>
+          </div>
         </div>
+        <div id="pdf-status"></div>
         <div style="overflow-x:auto;">
           <table class="item-table">
             <thead>
@@ -64,14 +76,22 @@ const NuevoDespachoView = {
             <tbody id="filas-body"></tbody>
           </table>
         </div>
+        <div style="margin-top:10px; border-top:1px solid var(--border-light); padding-top:10px;">
+          <button class="btn-text" id="btn-import-excel">
+            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Importar Excel para completar
+          </button>
+          <input type="file" id="input-excel" accept=".xlsx,.xls" style="display:none;" />
+          <div id="excel-status"></div>
+        </div>
       </div>
 
       <div class="hint-box">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-        <p>Al escribir el SKU se muestra automáticamente cuánto stock hay y en qué ubicación. Verifica antes de enviar a picking.</p>
+        <p>Importa el PDF de la guía para llenar los ítems automáticamente. El Excel del cliente solo completa destino/consignatarios — los ítems siempre vienen de la guía, que es la fuente confiable.</p>
       </div>
 
-      <button class="btn-primary" id="btn-crear">Crear despacho y enviar a picking</button>
+      <button class="btn-primary" id="btn-crear">Generar orden de picking</button>
     `;
   },
 
@@ -85,9 +105,93 @@ const NuevoDespachoView = {
       this.renderFilas();
     });
 
-    document.getElementById('btn-crear').addEventListener('click', () => this.crearDespacho());
+    document.getElementById('btn-import-pdf').addEventListener('click', () => {
+      document.getElementById('input-pdf').click();
+    });
+
+    document.getElementById('input-pdf').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      await this.importarPDF(file);
+      e.target.value = '';
+    });
+
+    document.getElementById('btn-import-excel').addEventListener('click', () => {
+      document.getElementById('input-excel').click();
+    });
+
+    document.getElementById('input-excel').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      await this.importarExcel(file);
+      e.target.value = '';
+    });
+
+    document.getElementById('btn-crear').addEventListener('click', () => this.crearOrdenPicking());
 
     this.renderFilas();
+  },
+
+  async importarPDF(file) {
+    const statusEl = document.getElementById('pdf-status');
+    statusEl.innerHTML = `<p style="font-size:11px; color:var(--text-tertiary); margin:0 0 8px;">Leyendo guía...</p>`;
+
+    const { data, error } = await procesarGuiaPDF(file);
+
+    if (error || !data) {
+      statusEl.innerHTML = `<p style="font-size:11px; color:var(--danger); margin:0 0 8px;">No se pudo leer el PDF: ${escapeHtml(error || 'error desconocido')}</p>`;
+      return;
+    }
+
+    if (data.errores.length > 0) {
+      statusEl.innerHTML = `<p style="font-size:11px; color:var(--warning); margin:0 0 8px;">${escapeHtml(data.errores.join(' '))}</p>`;
+      return;
+    }
+
+    if (data.guia) document.getElementById('f-gr').value = data.guia;
+
+    this._filas = data.items.map(it => ({
+      sku: it.codigo,
+      cantidad: String(it.cantidad),
+      serie: it.serie || '',
+      stockInfo: null
+    }));
+
+    statusEl.innerHTML = `<p style="font-size:11px; color:var(--success); margin:0 0 8px;">${data.items.length} ítems importados. Verificando stock...</p>`;
+    this.renderFilas();
+
+    for (let i = 0; i < this._filas.length; i++) {
+      this._filas[i].checking = true;
+      await this.verificarStock(i);
+    }
+
+    statusEl.innerHTML = `<p style="font-size:11px; color:var(--success); margin:0 0 8px;">${data.items.length} ítems importados y verificados contra stock.</p>`;
+  },
+
+  async importarExcel(file) {
+    const statusEl = document.getElementById('excel-status');
+    const gr = document.getElementById('f-gr').value.trim();
+
+    if (!gr) {
+      statusEl.innerHTML = `<p style="font-size:11px; color:var(--warning); margin:6px 0 0;">Primero importa el PDF (o escribe el N° GR) para poder buscar en el Excel.</p>`;
+      return;
+    }
+
+    statusEl.innerHTML = `<p style="font-size:11px; color:var(--text-tertiary); margin:6px 0 0;">Buscando GR ${escapeHtml(gr)} en el Excel...</p>`;
+
+    const { data, error } = await buscarDatosPorGR(file, gr);
+
+    if (error || !data) {
+      statusEl.innerHTML = `<p style="font-size:11px; color:var(--danger); margin:6px 0 0;">${escapeHtml(error || 'No se encontraron datos.')}</p>`;
+      return;
+    }
+
+    if (data.destino) document.getElementById('f-destino').value = data.destino;
+
+    const consig = [data.consignatario_1, data.consignatario_2].filter(Boolean).join(' / ');
+    if (consig) document.getElementById('f-consignatarios').value = consig;
+
+    statusEl.innerHTML = `<p style="font-size:11px; color:var(--success); margin:6px 0 0;">Datos completados desde la hoja "${escapeHtml(data.hoja)}" (destino y consignatarios). Los ítems no se modificaron.</p>`;
   },
 
   renderFilas() {
@@ -179,13 +283,14 @@ const NuevoDespachoView = {
     }
   },
 
-  async crearDespacho() {
+  async crearOrdenPicking() {
     const btn = document.getElementById('btn-crear');
     const gr = document.getElementById('f-gr').value.trim();
     const fecha = document.getElementById('f-fecha').value;
     const cliente = document.getElementById('f-cliente').value;
     const destino = document.getElementById('f-destino').value.trim();
     const contrata = document.getElementById('f-contrata').value.trim();
+    const consignatarios = document.getElementById('f-consignatarios').value.trim();
 
     const itemsValidos = this._filas.filter(f => f.sku.trim() && Number(f.cantidad) > 0);
 
@@ -195,7 +300,7 @@ const NuevoDespachoView = {
     }
 
     btn.disabled = true;
-    btn.textContent = 'Creando...';
+    btn.textContent = 'Generando...';
 
     const items = itemsValidos.map(f => {
       const stockInfo = f.stockInfo && f.stockInfo.length > 0 ? f.stockInfo[0] : null;
@@ -212,16 +317,14 @@ const NuevoDespachoView = {
     });
 
     const { data, error } = await crearDespacho({
-      gr, fecha, cliente, destino,
-      destino_lugar: destino,
-      contrata,
+      gr, fecha, cliente, destino, contrata, consignatarios,
       items
     });
 
     if (error) {
-      alert('Error al crear el despacho. Revisa tu conexión.');
+      alert('Error al generar la orden. Revisa tu conexión.');
       btn.disabled = false;
-      btn.textContent = 'Crear despacho y enviar a picking';
+      btn.textContent = 'Generar orden de picking';
       return;
     }
 
@@ -229,4 +332,4 @@ const NuevoDespachoView = {
   }
 };
 
-Router.register('nuevo-despacho', NuevoDespachoView);
+Router.register('nuevo-despacho', NuevoPickingView);

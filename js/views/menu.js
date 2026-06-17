@@ -30,7 +30,7 @@ const MenuView = {
       <p class="section-label" style="margin-top:16px;">Gestión y reportes</p>
       <div class="menu-grid">
         <button class="menu-item" data-nav="nuevo-despacho">
-          <span>Nuevo despacho</span>
+          <span>Nueva orden de picking</span>
           <small>Cargar guía y enviar a picking</small>
         </button>
         <button class="menu-item" data-nav="kardex">

@@ -123,7 +123,7 @@ async function buscarStockPorSKU(sku, soloDisponible = true) {
 // FUNCIONES DE ACCESO A DATOS - DESPACHOS
 // ============================================================
 
-async function crearDespacho({ gr, fecha, cliente, destino, destino_lugar, contrata, observaciones, items }) {
+async function crearDespacho({ gr, fecha, cliente, destino, contrata, consignatarios, observaciones, items }) {
   // 1. Crear cabecera del despacho
   const { data: despacho, error: errDespacho } = await sb
     .from('despachos')
@@ -132,8 +132,8 @@ async function crearDespacho({ gr, fecha, cliente, destino, destino_lugar, contr
       fecha: fecha || null,
       cliente: cliente || null,
       destino: destino || null,
-      destino_lugar: destino_lugar || null,
       contrata: contrata || null,
+      consignatarios: consignatarios || null,
       observaciones: observaciones || null,
       status: 'PENDIENTE'
     }])
