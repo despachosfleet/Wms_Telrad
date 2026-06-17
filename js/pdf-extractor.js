@@ -118,6 +118,8 @@ function parsearGuiaTelrad(texto) {
     resultado.errores.push('No se detectaron items. Verifica que el PDF tenga el formato estándar de guía Telrad.');
   }
 
+  resultado.textoCrudo = texto;
+
   return resultado;
 }
 
