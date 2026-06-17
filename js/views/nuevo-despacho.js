@@ -144,7 +144,12 @@ const NuevoPickingView = {
     }
 
     if (data.errores.length > 0) {
-      statusEl.innerHTML = `<p style="font-size:11px; color:var(--warning); margin:0 0 8px;">${escapeHtml(data.errores.join(' '))}</p>`;
+      const textoEscapado = escapeHtml(data.textoCrudo || '');
+      statusEl.innerHTML = `
+        <p style="font-size:11px; color:var(--warning); margin:0 0 8px;">${escapeHtml(data.errores.join(' '))}</p>
+        <p style="font-size:11px; color:var(--text-secondary); margin:0 0 4px;">Copia el texto de abajo y pégalo en el chat para diagnosticar:</p>
+        <textarea readonly style="width:100%; height:160px; font-size:10px; font-family:monospace; border:1px solid var(--border-strong); border-radius:6px; padding:6px;">${textoEscapado}</textarea>
+      `;
       return;
     }
 
