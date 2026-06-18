@@ -382,3 +382,81 @@ async function obtenerKardex({ sku = '', limit = 50 } = {}) {
   if (error) return [];
   return data || [];
 }
+
+// ============================================================
+// FUNCIONES - GUIAS PENDIENTES (carga masiva desde Excel)
+// ============================================================
+
+async function guardarGuiasPendientes(guias) {
+  // Solo inserta GRs que no esten ya pendientes (evita duplicar
+  // si se vuelve a subir el mismo Excel). El indice unico en
+  // Supabase tambien protege esto a nivel de base de datos.
+  const filas = guias.map(g => ({
+    gr: g.gr,
+    cliente: g.cabecera ? g.cabecera.cliente : null,
+    destino: g.cabecera ? g.cabecera.destino : null,
+    razon_social: g.cabecera ? g.cabecera.razon_social : null,
+    agencia: g.cabecera ? g.cabecera.agencia : null,
+    consignatario_1: g.cabecera ? g.cabecera.consignatario_1 : null,
+    consignatario_2: g.cabecera ? g.cabecera.consignatario_2 : null,
+    items: g.items,
+    origen: 'EXCEL',
+    estado: 'PENDIENTE'
+  }));
+
+  const { data, error } = await sb
+    .from('guias_pendientes')
+    .upsert(filas, { onConflict: 'gr', ignoreDuplicates: true })
+    .select();
+
+  if (error) {
+    console.error('Error guardarGuiasPendientes:', error);
+    return { data: null, error };
+  }
+
+  return { data, error: null };
+}
+
+async function guardarGuiaPendienteManual(gr) {
+  const { data, error } = await sb
+    .from('guias_pendientes')
+    .insert([{ gr: gr.trim(), items: [], origen: 'MANUAL', estado: 'PENDIENTE' }])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error guardarGuiaPendienteManual:', error);
+    return { data: null, error };
+  }
+
+  return { data, error: null };
+}
+
+async function obtenerGuiasPendientes({ estado = 'PENDIENTE' } = {}) {
+  const { data, error } = await sb
+    .from('guias_pendientes')
+    .select('*')
+    .eq('estado', estado)
+    .order('creado_en', { ascending: false });
+
+  if (error) {
+    console.error('Error obtenerGuiasPendientes:', error);
+    return [];
+  }
+
+  return data || [];
+}
+
+async function marcarGuiaPendienteProcesada(id, despachoId) {
+  const { error } = await sb
+    .from('guias_pendientes')
+    .update({ estado: 'PROCESADA', despacho_id: despachoId, procesado_en: new Date().toISOString() })
+    .eq('id', id);
+
+  if (error) {
+    console.error('Error marcarGuiaPendienteProcesada:', error);
+    return { error };
+  }
+
+  return { error: null };
+}

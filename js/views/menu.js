@@ -33,6 +33,10 @@ const MenuView = {
           <span>Nueva orden de picking</span>
           <small>Cargar guía y enviar a picking</small>
         </button>
+        <button class="menu-item" data-nav="guias-pendientes">
+          <span>Guías pendientes</span>
+          <small>Resolver guías cargadas por Excel</small>
+        </button>
         <button class="menu-item" data-nav="kardex">
           <span>Kardex</span>
           <small>Historial de movimientos</small>

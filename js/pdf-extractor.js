@@ -63,55 +63,83 @@ function parsearGuiaTelrad(texto) {
   const mGuia = texto.match(/(T0\d\d-\d{10})/);
   if (mGuia) resultado.guia = mGuia[1];
 
-  const mFecha = texto.match(/FECHA DE EMISION\s+(\d{2}\/\d{2}\/\d{4})/);
+  const mFecha = texto.match(/(\d{2}\/\d{2}\/\d{4})/);
   if (mFecha) resultado.fecha = mFecha[1];
 
   const mSite = texto.match(/Site\s*:\s*([^\n]+?)\s+Usuario/);
   if (mSite) resultado.site = mSite[1].trim();
 
-  const mSolicitud = texto.match(/SOLICITUD:\s*(\S+)/);
+  const mSolicitud = texto.match(/SOLICITUD\s*:\s*(\S+)/i);
   if (mSolicitud) resultado.solicitud = mSolicitud[1];
 
-  const lineas = texto.split('\n');
-  let capturando = false;
+  const lineas = texto.split('\n').map(l => l.trim()).filter(Boolean);
 
-  const patronLinea = /^(\d+)\s+([\d,.]+)\s+(UND|MT|MTS|M)\s+(\S+)\s+(.+)$/;
-  const patronSerie = /\s([A-Z0-9]{10,})$/;
+  let inicio = lineas.findIndex(l => /SEC\s*\.?\s*CANT/i.test(l));
+  let fin = lineas.findIndex(l => /^Observaci/i.test(l));
+  if (inicio === -1) {
+    resultado.errores.push('No se detectaron items. Verifica que el PDF tenga el formato estándar de guía Telrad.');
+    resultado.textoCrudo = texto;
+    return resultado;
+  }
+  if (fin === -1) fin = lineas.length;
 
-  for (const lineaRaw of lineas) {
-    const linea = lineaRaw.trim();
+  const bloque = lineas.slice(inicio + 1, fin);
 
-    if (/^SEC\.\s+CANT/.test(linea)) {
-      capturando = true;
+  // Codigo de producto suelto en su propia linea (ej: ENT96007867)
+  const patronCodigoSuelto = /^([A-Z]{2,5}\d{6,})$/;
+  // Linea de item: SEC CANT UM seguido del resto (codigo y/o serie y/o descripcion)
+  const patronSecCantUm = /^(\d{1,3})\s+([\d,.]+)\s+UND\s+(.+)$/;
+  // Codigo embebido en el resto de la linea
+  const patronCodigoEmbebido = /\b([A-Z]{2,5}\d{6,})\b/;
+  // Serie: token largo alfanumerico al final de la linea
+  const patronSerieFinal = /\b(\d{6,}[A-Z0-9]{4,}|\d{15,})\b\s*$/;
+
+  let codigoPendiente = null;
+
+  for (let i = 0; i < bloque.length; i++) {
+    const linea = bloque[i];
+
+    if (patronCodigoSuelto.test(linea)) {
+      codigoPendiente = linea;
       continue;
     }
-    if (linea.startsWith('Observación') || linea.startsWith('Observacion')) {
-      capturando = false;
-      continue;
-    }
-    if (!capturando || !linea) continue;
 
-    const m = linea.match(patronLinea);
+    const m = linea.match(patronSecCantUm);
     if (!m) continue;
 
-    const [, sec, cantStr, um, codigo, restoOriginal] = m;
-    let resto = restoOriginal;
+    const [, sec, cantStr, resto] = m;
+    let codigo = codigoPendiente;
+    let serie = null;
+    let descripcion = resto;
 
-    let serie = '';
-    const mSerie = resto.match(patronSerie);
-    if (mSerie) {
-      serie = mSerie[1];
-      resto = resto.slice(0, mSerie.index).trim();
+    const mCod = resto.match(patronCodigoEmbebido);
+    if (mCod) {
+      if (!codigo) {
+        codigo = mCod[1];
+        descripcion = resto.replace(mCod[0], '').trim();
+      } else {
+        serie = mCod[1];
+        descripcion = resto.replace(mCod[0], '').trim();
+      }
+    }
+
+    if (!serie) {
+      const mSerie = descripcion.match(patronSerieFinal);
+      if (mSerie) {
+        serie = mSerie[1];
+        descripcion = descripcion.slice(0, mSerie.index).trim();
+      }
     }
 
     resultado.items.push({
       sec: Number(sec),
       cantidad: Number(cantStr.replace(/,/g, '')),
-      um,
-      codigo: codigo.trim(),
-      descripcion: resto.trim(),
-      serie: serie || null
+      codigo: codigo || null,
+      serie: serie || null,
+      descripcion: descripcion.trim()
     });
+
+    codigoPendiente = null;
   }
 
   if (resultado.items.length === 0) {
