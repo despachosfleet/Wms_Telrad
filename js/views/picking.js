@@ -1,49 +1,133 @@
 // ============================================================
-// VISTA: LISTA DE DESPACHOS PENDIENTES (PICKING)
+// VISTA: ORDENES DE PICKING (lista filtrable, expandible)
+// Estados: PENDIENTE -> EN_PROCESO (calculado) -> PICKEADO -> DESPACHADO
+// Mismo patron de expandir/colapsar que Consulta de Stock.
 // ============================================================
 
+const ESTADOS_FILTRO = [
+  { valor: 'TODOS', label: 'Todos' },
+  { valor: 'PENDIENTE', label: 'Pendiente' },
+  { valor: 'EN_PROCESO', label: 'En proceso' },
+  { valor: 'PICKEADO', label: 'Pickeado' },
+  { valor: 'DESPACHADO', label: 'Despachado' }
+];
+
+const FECHAS_FILTRO = [
+  { valor: 'TODAS', label: 'Todas' },
+  { valor: 'HOY', label: 'Hoy' },
+  { valor: 'AYER', label: 'Ayer' }
+];
+
+function pillEstado(estado) {
+  if (estado === 'PICKEADO') return '<span class="pill pill-success">Pickeado</span>';
+  if (estado === 'DESPACHADO') return '<span class="pill" style="background:#37415110; color:#374151;">Despachado</span>';
+  if (estado === 'EN_PROCESO') return '<span class="pill" style="background:var(--neutral-bg); color:var(--text-secondary);">En proceso</span>';
+  return '<span class="pill" style="background:var(--neutral-bg); color:var(--text-secondary);">Pendiente</span>';
+}
+
+function rangoFecha(filtro) {
+  const hoy = new Date();
+  const inicioHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  if (filtro === 'HOY') {
+    return { desde: inicioHoy.toISOString(), hasta: new Date(inicioHoy.getTime() + 86400000).toISOString() };
+  }
+  if (filtro === 'AYER') {
+    const ayer = new Date(inicioHoy.getTime() - 86400000);
+    return { desde: ayer.toISOString(), hasta: inicioHoy.toISOString() };
+  }
+  return { desde: null, hasta: null };
+}
+
+// ============================================================
+// LISTA: ORDENES DE PICKING (sin boton de despachar)
+// ============================================================
 const PickingListaView = {
-  title: 'Picking',
+  title: 'Órdenes de picking',
+  _filtroEstado: 'TODOS',
+  _filtroFecha: 'TODAS',
+  _despachos: [],
 
   render() {
     return `
-      <p class="result-count" id="contador-pend">Cargando despachos pendientes...</p>
-      <div id="lista-pendientes"></div>
+      <div class="card">
+        <div class="chips" id="chips-estado"></div>
+        <div class="chips" id="chips-fecha" style="margin-top:8px;"></div>
+      </div>
+      <div id="lista-ordenes-cont"></div>
     `;
   },
 
-  async afterRender() {
-    const cont = document.getElementById('lista-pendientes');
-    const contador = document.getElementById('contador-pend');
+  afterRender() {
+    this.renderChips();
+    this.cargarYRender();
+  },
 
-    const pendientes = await obtenerDespachosPendientes();
+  renderChips() {
+    document.getElementById('chips-estado').innerHTML = ESTADOS_FILTRO.map(e => `
+      <button class="chip ${this._filtroEstado === e.valor ? 'active' : ''}" data-estado="${e.valor}">${e.label}</button>
+    `).join('');
+    document.getElementById('chips-fecha').innerHTML = FECHAS_FILTRO.map(f => `
+      <button class="chip ${this._filtroFecha === f.valor ? 'active' : ''}" data-fecha="${f.valor}">${f.label}</button>
+    `).join('');
 
-    contador.textContent = `${pendientes.length} despacho${pendientes.length === 1 ? '' : 's'} pendiente${pendientes.length === 1 ? '' : 's'}`;
+    document.querySelectorAll('[data-estado]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this._filtroEstado = btn.dataset.estado;
+        this.renderChips();
+        this.renderLista();
+      });
+    });
+    document.querySelectorAll('[data-fecha]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this._filtroFecha = btn.dataset.fecha;
+        this.renderChips();
+        this.cargarYRender();
+      });
+    });
+  },
 
-    if (pendientes.length === 0) {
-      cont.innerHTML = `
-        <div class="empty-state">
-          No hay despachos pendientes.<br>
-          <button class="btn-text" style="margin-top:8px; display:inline-flex;" id="btn-ir-nuevo">Crear nuevo despacho</button>
-        </div>
-      `;
-      const btn = document.getElementById('btn-ir-nuevo');
-      if (btn) btn.addEventListener('click', () => Router.navigate('nuevo-despacho'));
+  async cargarYRender() {
+    const cont = document.getElementById('lista-ordenes-cont');
+    cont.innerHTML = `<div class="empty-state">Cargando órdenes...</div>`;
+
+    const { desde, hasta } = rangoFecha(this._filtroFecha);
+    this._despachos = await obtenerTodosLosDespachos({ fechaDesde: desde, fechaHasta: hasta });
+    this.renderLista();
+  },
+
+  renderLista() {
+    const cont = document.getElementById('lista-ordenes-cont');
+    let lista = this._despachos.map(d => ({ ...d, _estadoVisual: calcularEstadoVisual(d) }));
+
+    if (this._filtroEstado !== 'TODOS') {
+      lista = lista.filter(d => d._estadoVisual === this._filtroEstado);
+    }
+
+    if (lista.length === 0) {
+      cont.innerHTML = `<div class="empty-state">No hay órdenes con estos filtros.</div>`;
       return;
     }
 
     cont.innerHTML = `
       <div class="table-wrap">
         <table class="data-table">
-          <thead><tr><th>GR</th><th>Cliente</th><th>Destino</th><th>Fecha</th><th>Estado</th></tr></thead>
+          <thead><tr><th>GR</th><th>Cliente</th><th>Destino</th><th>Ítems</th><th>Estado</th></tr></thead>
           <tbody>
-            ${pendientes.map(d => `
-              <tr data-id="${d.id}">
+            ${lista.map((d, i) => `
+              <tr data-idx="${i}">
                 <td class="sku-cell">${escapeHtml(d.gr || 'Sin GR')}</td>
                 <td>${escapeHtml(d.cliente || '-')}</td>
                 <td class="wrap">${escapeHtml(d.destino || '-')}</td>
-                <td>${escapeHtml(d.fecha || '-')}</td>
-                <td><span class="pill pill-warning">Pendiente</span></td>
+                <td>${(d.despachos_items || []).length}</td>
+                <td>${pillEstado(d._estadoVisual)}</td>
+              </tr>
+              <tr class="detail-row-tr" data-detail-for="${i}" style="display:none;">
+                <td colspan="5">
+                  <div style="padding:10px 4px;">
+                    <p style="font-size:11px; color:var(--text-secondary); margin:0 0 8px;">Fecha: ${escapeHtml(d.fecha || '-')} · Contrata: ${escapeHtml(d.contrata || '-')}</p>
+                    <button class="btn-primary" data-ir-picking="${d.id}" style="width:auto; padding:8px 16px;">Ir a pickear</button>
+                  </div>
+                </td>
               </tr>
             `).join('')}
           </tbody>
@@ -51,32 +135,36 @@ const PickingListaView = {
       </div>
     `;
 
-    cont.querySelectorAll('tr[data-id]').forEach(card => {
-      card.addEventListener('click', () => {
-        Router.navigate('picking', { despachoId: Number(card.dataset.id) });
+    cont.querySelectorAll('tbody tr[data-idx]').forEach(tr => {
+      tr.addEventListener('click', (e) => {
+        if (e.target.closest('[data-ir-picking]')) return;
+        const idx = tr.dataset.idx;
+        const detailTr = cont.querySelector(`tr[data-detail-for="${idx}"]`);
+        const isOpen = detailTr.style.display !== 'none';
+        cont.querySelectorAll('.detail-row-tr').forEach(d => d.style.display = 'none');
+        detailTr.style.display = isOpen ? 'none' : '';
       });
+    });
+
+    cont.querySelectorAll('[data-ir-picking]').forEach(btn => {
+      btn.addEventListener('click', () => Router.navigate('picking', { despachoId: btn.dataset.irPicking }));
     });
   }
 };
 
 Router.register('picking-lista', PickingListaView);
 
-
 // ============================================================
-// VISTA: PICKING GUIADO (item por item)
+// PICKING POR LINEAS: ver todos los items a la vez, trabajar
+// el que quieras, en cualquier orden, sin perder lo ya hecho.
 // ============================================================
-
 const PickingView = {
-  title: 'Picking guiado',
-  _items: [],
+  title: 'Picking',
   _despacho: null,
-  _index: 0,
+  _items: [],
 
-  render(params) {
-    if (!params || !params.despachoId) {
-      return '<div class="empty-state">Despacho no especificado.</div>';
-    }
-    return `<div id="picking-content"><div class="loading">Cargando despacho...</div></div>`;
+  render() {
+    return `<div id="picking-content"></div><div id="scanner-container"></div>`;
   },
 
   async afterRender(params) {
@@ -89,129 +177,164 @@ const PickingView = {
 
     this._despacho = despacho;
     this._items = items;
-    this._index = items.findIndex(it => !it.observaciones || !it.observaciones.startsWith('PICKEADO'));
-    if (this._index === -1) this._index = items.length;
 
-    this.renderEstado();
-  },
-
-  renderEstado() {
-    const cont = document.getElementById('picking-content');
-    const total = this._items.length;
-    const completados = this._items.filter(it => it.observaciones && it.observaciones.startsWith('PICKEADO')).length;
-    const pct = total > 0 ? Math.round((completados / total) * 100) : 0;
-
-    let bodyHtml = '';
-
-    if (this._index >= total) {
-      // Todo pickeado
-      bodyHtml = `
-        <div class="card" style="text-align:center; padding:24px;">
-          <p style="font-size:15px; font-weight:600; margin:0 0 6px;">Picking completado</p>
-          <p style="font-size:13px; color:var(--text-secondary); margin:0 0 16px;">
-            ${completados} de ${total} ítems pickeados para ${escapeHtml(this._despacho.gr || 'este despacho')}.
-          </p>
-          <button class="btn-primary" id="btn-finalizar">Finalizar despacho</button>
-        </div>
-      `;
-    } else {
-      const item = this._items[this._index];
-
-      bodyHtml = `
-        <div class="picking-item-card">
-          <div>
-            <p style="font-size:11px; color:var(--text-tertiary); margin:0 0 4px; text-transform:uppercase; font-weight:600; letter-spacing:0.04em;">Ítem ${this._index + 1} de ${total}</p>
-            <p class="picking-sku">${escapeHtml(item.sku)}</p>
-            <p style="font-size:13px; color:var(--text-secondary); margin:4px 0 0;">${escapeHtml(item.descripcion || '')}</p>
-          </div>
-
-          ${item.encontrado === false ? `
-            <div class="hint-box" style="background:var(--danger-bg);">
-              <svg viewBox="0 0 24 24" stroke="#C0362C"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-              <p style="color:var(--danger-text);">Este SKU no se encontró en el stock disponible. Verifica con Logística antes de continuar.</p>
-            </div>
-          ` : `
-            <div class="picking-loc">
-              <div class="loc-badge">
-                <div style="font-size:10px; opacity:0.7; margin-bottom:2px;">UBICACIÓN</div>
-                ${escapeHtml(item.ubicacion_fisica || 'Sin asignar')}
-              </div>
-              <div class="loc-badge">
-                <div style="font-size:10px; opacity:0.7; margin-bottom:2px;">PALETA / PEDIDO</div>
-                ${escapeHtml(item.paleta_pedido || '-')}
-              </div>
-            </div>
-          `}
-
-          <div class="field">
-            <label>Cantidad solicitada: <b>${formatNum(item.cantidad)}</b></label>
-            <label style="margin-top:6px;">Cantidad pickeada</label>
-            <input type="number" id="cant-pickeada" value="${item.cantidad}" min="0" step="any" />
-          </div>
-
-          ${item.serie ? `
-            <div class="field">
-              <label>Serie esperada</label>
-              <input type="text" value="${escapeHtml(item.serie)}" readonly style="background:var(--bg-secondary);" />
-            </div>
-          ` : ''}
-
-          <button class="btn-primary" id="btn-confirmar">Confirmar y continuar</button>
-          <button class="btn-secondary" id="btn-omitir">Omitir / reportar diferencia</button>
-        </div>
-      `;
-    }
-
-    cont.innerHTML = `
-      <div class="card" style="padding:12px 14px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-          <p class="picking-progress">${escapeHtml(this._despacho.gr || 'Despacho')} · ${escapeHtml(this._despacho.destino || '')}</p>
-          <p class="picking-progress">${completados}/${total}</p>
-        </div>
-        <div class="progress-bar"><div class="progress-bar-fill" style="width:${pct}%;"></div></div>
-      </div>
-      ${bodyHtml}
-    `;
-
-    const btnConfirmar = document.getElementById('btn-confirmar');
-    if (btnConfirmar) btnConfirmar.addEventListener('click', () => this.confirmarItem());
-
-    const btnOmitir = document.getElementById('btn-omitir');
-    if (btnOmitir) btnOmitir.addEventListener('click', () => this.omitirItem());
-
-    const btnFinalizar = document.getElementById('btn-finalizar');
-    if (btnFinalizar) btnFinalizar.addEventListener('click', () => this.finalizar());
-  },
-
-  async confirmarItem() {
-    const item = this._items[this._index];
-    const cantInput = document.getElementById('cant-pickeada');
-    const cantidad = Number(cantInput.value);
-
-    if (!cantidad || cantidad < 0) {
-      alert('Ingresa una cantidad válida.');
+    if (despacho.status === 'PICKEADO' || despacho.status === 'DESPACHADO') {
+      this.renderConfirmarDespacho();
       return;
     }
 
-    if (item.encontrado !== false && item.stock_id) {
-      const { error } = await confirmarPicking(item.id, item.stock_id, cantidad);
-      if (error) {
-        alert('Error al registrar el picking. Intenta de nuevo.');
-        return;
-      }
-      this._items[this._index].observaciones = 'PICKEADO: ' + cantidad;
-    } else {
-      this._items[this._index].observaciones = 'PICKEADO: ' + cantidad + ' (no encontrado en stock)';
-    }
-
-    this._index++;
-    this.renderEstado();
+    await this.renderListaItems();
   },
 
-  omitirItem() {
-    this._items[this._index].observaciones = 'OMITIDO';
-    this._index++;
-    this.renderEstado();
+  async renderListaItems() {
+    const cont = document.getElementById('picking-content');
+    const completados = this._items.filter(it => it.observaciones && it.observaciones.startsWith('PICKEADO')).length;
+    const total = this._items.length;
+
+    cont.innerHTML = `
+      <div class="card">
+        <p class="card-title" style="margin:0;">${escapeHtml(this._despacho.gr || 'Despacho')}</p>
+        <p style="font-size:11px; color:var(--text-secondary); margin:4px 0 0;">${escapeHtml(this._despacho.destino || '-')} · ${completados}/${total} ítems pickeados</p>
+      </div>
+      <div id="items-picking-cont"></div>
+      ${completados >= total && total > 0 ? `<button class="btn-primary" id="btn-terminar-picking">Terminar picking</button>` : ''}
+    `;
+
+    const itemsCont = document.getElementById('items-picking-cont');
+    itemsCont.innerHTML = this._items.map((it, i) => {
+      const yaPickeado = it.observaciones && it.observaciones.startsWith('PICKEADO');
+      return `
+        <div class="card" style="margin-bottom:8px; ${yaPickeado ? 'border-color:var(--success-text);' : ''}">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <div>
+              <div style="font-size:12.5px; font-weight:600;">${escapeHtml(it.sku)}</div>
+              <div style="font-size:11px; color:var(--text-secondary);">Pedido: ${formatNum(it.cantidad)} ${it.serie ? '· Serie: ' + escapeHtml(it.serie) : ''}</div>
+            </div>
+            ${yaPickeado ? '<span class="pill pill-success">Pickeado</span>' : ''}
+          </div>
+          <div id="item-detalle-${i}" style="margin-top:8px; ${yaPickeado ? 'display:none;' : ''}"></div>
+          ${!yaPickeado ? `<button class="btn-text" data-expandir="${i}" style="margin-top:6px;">Trabajar este ítem</button>` : `<button class="btn-text" data-expandir="${i}" style="margin-top:6px;">Ver / corregir</button>`}
+        </div>
+      `;
+    }).join('');
+
+    itemsCont.querySelectorAll('[data-expandir]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = Number(btn.dataset.expandir);
+        this.renderDetalleItem(i);
+      });
+    });
+
+    const btnTerminar = document.getElementById('btn-terminar-picking');
+    if (btnTerminar) btnTerminar.addEventListener('click', () => this.terminarPickingYRedirigir());
+  },
+
+  async renderDetalleItem(index) {
+    const item = this._items[index];
+    const detalleEl = document.getElementById(`item-detalle-${index}`);
+    detalleEl.style.display = '';
+    detalleEl.innerHTML = `<p style="font-size:11px; color:var(--text-tertiary);">Buscando stock...</p>`;
+
+    let opciones = [];
+    let origen = null;
+
+    if (item.stock_id) {
+      const { data: stockActual } = await sb.from('stock').select('*').eq('id', item.stock_id).single();
+      if (stockActual) opciones = [stockActual];
+    } else {
+      const resultado = await buscarStockParaItem(item.sku, item.paleta_pedido);
+      opciones = resultado.data;
+      origen = resultado.origen;
+    }
+
+    if (opciones.length === 0) {
+      detalleEl.innerHTML = `
+        <div class="pill pill-danger" style="margin-bottom:8px;">Sin stock identificado — revisar manual</div>
+        <p style="font-size:11px; color:var(--text-secondary);">No se encontró por pedido ni por SKU. Verifica el SKU o asigna manualmente desde Movimientos.</p>
+      `;
+      return;
+    }
+
+    const origenTxt = origen === 'INGRESO_NUEVO' ? 'Ingreso nuevo' : (origen === 'MUDANZA' ? 'Mudanza' : '');
+
+    detalleEl.innerHTML = `
+      ${origenTxt ? `<p style="font-size:11px; color:var(--text-secondary); margin:0 0 6px;">Origen detectado: <strong>${origenTxt}</strong></p>` : ''}
+      <div class="field">
+        <label>Ubicación / paleta</label>
+        <select id="select-stock-${index}">
+          ${opciones.map(o => `<option value="${o.id}">${escapeHtml(o.ubicacion_fisica || o.paleta_pedido || 'sin ubicación')} (disp: ${formatNum(o.cantidad)})</option>`).join('')}
+        </select>
+      </div>
+      <div class="field-grid" style="margin-top:8px;">
+        <div class="field">
+          <label>Cantidad pickeada</label>
+          <input type="number" id="cant-pickeada-${index}" value="${item.cantidad}" min="0" step="any" />
+        </div>
+        <div class="field">
+          <label>Observación</label>
+          <input type="text" id="obs-pickeada-${index}" placeholder="Opcional" />
+        </div>
+      </div>
+      <button class="btn-primary" id="btn-confirmar-item-${index}" style="margin-top:10px;">Confirmar este ítem</button>
+      <div id="msg-item-${index}"></div>
+    `;
+
+    document.getElementById(`btn-confirmar-item-${index}`).addEventListener('click', () => this.confirmarItem(index, opciones));
+  },
+
+  async confirmarItem(index, opciones) {
+    const item = this._items[index];
+    const stockId = Number(document.getElementById(`select-stock-${index}`).value);
+    const cantidad = Number(document.getElementById(`cant-pickeada-${index}`).value);
+    const observacion = document.getElementById(`obs-pickeada-${index}`).value.trim();
+    const msgEl = document.getElementById(`msg-item-${index}`);
+
+    if (!cantidad || cantidad <= 0) {
+      msgEl.innerHTML = `<p style="font-size:11px; color:var(--danger);">Ingresa una cantidad válida.</p>`;
+      return;
+    }
+
+    // Si el item aun no tenia stock asignado, asignarlo primero (reserva)
+    if (!item.stock_id || item.stock_id !== stockId) {
+      await asignarStockAItem(item.id, stockId);
+    }
+
+    const { error } = await confirmarPicking(item.id, stockId, cantidad, observacion);
+
+    if (error) {
+      msgEl.innerHTML = `<p style="font-size:11px; color:var(--danger);">Error al confirmar. Intenta de nuevo.</p>`;
+      return;
+    }
+
+    const { items } = await obtenerDespachoConItems(this._despacho.id);
+    this._items = items;
+    await this.renderListaItems();
+  },
+
+  async terminarPickingYRedirigir() {
+    const { error } = await terminarPicking(this._despacho.id);
+    if (error) {
+      alert('Error al marcar el picking como terminado. Intenta de nuevo.');
+      return;
+    }
+    Router.navigate('picking-lista');
+  },
+
+  renderConfirmarDespacho() {
+    const cont = document.getElementById('picking-content');
+    const yaDespachado = this._despacho.status === 'DESPACHADO';
+    cont.innerHTML = `
+      <div class="card" style="text-align:center; padding:24px;">
+        <p style="font-size:15px; font-weight:600; margin:0 0 6px;">${yaDespachado ? 'Ya despachado' : 'Ya está pickeado'}</p>
+        <p style="font-size:13px; color:var(--text-secondary); margin:0 0 16px;">
+          ${escapeHtml(this._despacho.gr || 'Este despacho')} ${yaDespachado ? 'ya fue confirmado como despachado.' : 'está listo. Confirma cuando el bulto haya salido realmente del almacén.'}
+        </p>
+        ${!yaDespachado ? `<button class="btn-primary" id="btn-confirmar-despacho">Confirmar despacho (ya salió)</button>` : ''}
+      </div>
+    `;
+    if (!yaDespachado) {
+      document.getElementById('btn-confirmar-despacho').addEventListener('click', () => this.finalizar());
+    }
   },
 
   async finalizar() {
@@ -221,3 +344,125 @@ const PickingView = {
 };
 
 Router.register('picking', PickingView);
+
+// ============================================================
+// DESPACHOS Y SALIDAS: misma data, con boton de despachar
+// ============================================================
+const DespachosSalidasView = {
+  title: 'Despachos y salidas',
+  _filtroEstado: 'PICKEADO',
+  _filtroFecha: 'TODAS',
+  _despachos: [],
+
+  render() {
+    return `
+      <div class="card">
+        <div class="chips" id="chips-estado-desp"></div>
+        <div class="chips" id="chips-fecha-desp" style="margin-top:8px;"></div>
+      </div>
+      <div id="lista-despachos-cont"></div>
+    `;
+  },
+
+  afterRender() {
+    this.renderChips();
+    this.cargarYRender();
+  },
+
+  renderChips() {
+    const estadosRelevantes = ESTADOS_FILTRO.filter(e => ['TODOS', 'PICKEADO', 'DESPACHADO'].includes(e.valor));
+    document.getElementById('chips-estado-desp').innerHTML = estadosRelevantes.map(e => `
+      <button class="chip ${this._filtroEstado === e.valor ? 'active' : ''}" data-estado-d="${e.valor}">${e.label}</button>
+    `).join('');
+    document.getElementById('chips-fecha-desp').innerHTML = FECHAS_FILTRO.map(f => `
+      <button class="chip ${this._filtroFecha === f.valor ? 'active' : ''}" data-fecha-d="${f.valor}">${f.label}</button>
+    `).join('');
+
+    document.querySelectorAll('[data-estado-d]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this._filtroEstado = btn.dataset.estadoD;
+        this.renderChips();
+        this.renderLista();
+      });
+    });
+    document.querySelectorAll('[data-fecha-d]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this._filtroFecha = btn.dataset.fechaD;
+        this.renderChips();
+        this.cargarYRender();
+      });
+    });
+  },
+
+  async cargarYRender() {
+    const cont = document.getElementById('lista-despachos-cont');
+    cont.innerHTML = `<div class="empty-state">Cargando...</div>`;
+    const { desde, hasta } = rangoFecha(this._filtroFecha);
+    this._despachos = await obtenerTodosLosDespachos({ fechaDesde: desde, fechaHasta: hasta });
+    this.renderLista();
+  },
+
+  renderLista() {
+    const cont = document.getElementById('lista-despachos-cont');
+    let lista = this._despachos
+      .map(d => ({ ...d, _estadoVisual: calcularEstadoVisual(d) }))
+      .filter(d => d._estadoVisual === 'PICKEADO' || d._estadoVisual === 'DESPACHADO');
+
+    if (this._filtroEstado !== 'TODOS') {
+      lista = lista.filter(d => d._estadoVisual === this._filtroEstado);
+    }
+
+    if (lista.length === 0) {
+      cont.innerHTML = `<div class="empty-state">No hay despachos con estos filtros.</div>`;
+      return;
+    }
+
+    cont.innerHTML = `
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>GR</th><th>Cliente</th><th>Destino</th><th>Estado</th><th></th></tr></thead>
+          <tbody>
+            ${lista.map((d, i) => `
+              <tr data-idx="${i}">
+                <td class="sku-cell">${escapeHtml(d.gr || 'Sin GR')}</td>
+                <td>${escapeHtml(d.cliente || '-')}</td>
+                <td class="wrap">${escapeHtml(d.destino || '-')}</td>
+                <td>${pillEstado(d._estadoVisual)}</td>
+                <td>${d._estadoVisual === 'PICKEADO' ? `<button class="btn-text" data-despachar="${d.id}">🚛 Despachar</button>` : ''}</td>
+              </tr>
+              <tr class="detail-row-tr" data-detail-for="${i}" style="display:none;">
+                <td colspan="5">
+                  <div style="padding:10px 4px; font-size:11px; color:var(--text-secondary);">
+                    Fecha: ${escapeHtml(d.fecha || '-')} · Contrata: ${escapeHtml(d.contrata || '-')} · Ítems: ${(d.despachos_items || []).length}
+                  </div>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    cont.querySelectorAll('tbody tr[data-idx]').forEach(tr => {
+      tr.addEventListener('click', (e) => {
+        if (e.target.closest('[data-despachar]')) return;
+        const idx = tr.dataset.idx;
+        const detailTr = cont.querySelector(`tr[data-detail-for="${idx}"]`);
+        const isOpen = detailTr.style.display !== 'none';
+        cont.querySelectorAll('.detail-row-tr').forEach(d => d.style.display = 'none');
+        detailTr.style.display = isOpen ? 'none' : '';
+      });
+    });
+
+    cont.querySelectorAll('[data-despachar]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (!confirm('¿Confirmas que este bulto ya salió del almacén?')) return;
+        await finalizarDespacho(Number(btn.dataset.despachar));
+        await this.cargarYRender();
+      });
+    });
+  }
+};
+
+Router.register('despachos-salidas', DespachosSalidasView);

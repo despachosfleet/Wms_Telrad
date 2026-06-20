@@ -124,6 +124,11 @@ async function buscarStockPorSKU(sku, soloDisponible = true) {
 // ============================================================
 
 async function crearDespacho({ gr, fecha, cliente, destino, contrata, consignatarios, observaciones, items }) {
+  // Nota: aqui NO se busca ni reserva stock todavia (stock_id viene
+  // null). El cruce contra stock (mudanza/ingreso nuevo) y la reserva
+  // ocurren en la pantalla de Picking, al abrir cada item -asi se evita
+  // duplicar la revision que el usuario ya hace al pickear-.
+
   // 1. Crear cabecera del despacho
   const { data: despacho, error: errDespacho } = await sb
     .from('despachos')
@@ -171,11 +176,31 @@ async function crearDespacho({ gr, fecha, cliente, destino, contrata, consignata
   return { data: despacho, error: null };
 }
 
+// Trae todos los despachos (todos los estados), opcionalmente
+// filtrados por rango de fechas. El calculo de "EN PROCESO" (visual,
+// no se guarda en BD) se hace aparte con calcularEstadoVisual.
+async function obtenerTodosLosDespachos({ fechaDesde = null, fechaHasta = null } = {}) {
+  let query = sb.from('despachos').select('*, despachos_items(*)').order('creado_en', { ascending: false });
+
+  if (fechaDesde) query = query.gte('creado_en', fechaDesde);
+  if (fechaHasta) query = query.lte('creado_en', fechaHasta);
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('Error obtenerTodosLosDespachos:', error);
+    return [];
+  }
+  return data || [];
+}
+
+// Mantenido por compatibilidad: trae solo PENDIENTE y PICKEADO
+// (los que aun se pueden pickear o estan esperando despacho)
 async function obtenerDespachosPendientes() {
   const { data, error } = await sb
     .from('despachos')
     .select('*')
-    .eq('status', 'PENDIENTE')
+    .in('status', ['PENDIENTE', 'PICKEADO'])
     .order('creado_en', { ascending: false });
 
   if (error) {
@@ -183,6 +208,18 @@ async function obtenerDespachosPendientes() {
     return [];
   }
   return data || [];
+}
+
+// Calcula el estado visual de una orden, incluyendo "EN_PROCESO"
+// (no es un valor guardado en BD; se deriva de cuantos items ya
+// tienen observaciones que empiecen con "PICKEADO")
+function calcularEstadoVisual(despacho) {
+  if (despacho.status === 'DESPACHADO') return 'DESPACHADO';
+  if (despacho.status === 'PICKEADO') return 'PICKEADO';
+
+  const items = despacho.despachos_items || [];
+  const algunoPickeado = items.some(it => it.observaciones && it.observaciones.startsWith('PICKEADO'));
+  return algunoPickeado ? 'EN_PROCESO' : 'PENDIENTE';
 }
 
 async function obtenerDespachoConItems(despachoId) {
@@ -206,8 +243,75 @@ async function obtenerDespachoConItems(despachoId) {
 }
 
 // Marca un item del despacho como pickeado y descuenta del stock
-async function confirmarPicking(itemDespachoId, stockId, cantidadPickeada, usuario = '') {
-  // 1. Obtener stock actual
+// Busca stock para un item de picking, replicando el criterio manual
+// del usuario: primero por identificador de pedido/paleta (si el item
+// trae uno guardado en paleta_pedido al crear la orden, coincide con
+// stock.paleta_pedido -> es ingreso nuevo); si no hay coincidencia por
+// pedido, busca por SKU en stock disponible (mudanza). Si no encuentra
+// nada, devuelve lista vacia para que la vista muestre la alerta.
+async function buscarStockParaItem(sku, identificadorPedido) {
+  // 1. Buscar primero por numero de pedido (ingreso nuevo)
+  if (identificadorPedido) {
+    const { data: porPedido } = await sb
+      .from('stock')
+      .select('*')
+      .eq('paleta_pedido', identificadorPedido)
+      .eq('sku', sku)
+      .in('estado', ['DISPONIBLE', 'RESERVADO'])
+      .order('cantidad', { ascending: false });
+
+    if (porPedido && porPedido.length > 0) {
+      return { data: porPedido, origen: 'INGRESO_NUEVO' };
+    }
+  }
+
+  // 2. Buscar por SKU general (mudanza u otro stock disponible)
+  const { data: porSku } = await sb
+    .from('stock')
+    .select('*')
+    .eq('sku', sku)
+    .in('estado', ['DISPONIBLE', 'RESERVADO'])
+    .order('cantidad', { ascending: false });
+
+  if (porSku && porSku.length > 0) {
+    return { data: porSku, origen: 'MUDANZA' };
+  }
+
+  return { data: [], origen: null };
+}
+
+// Asigna (reserva) una fila de stock especifica a un item de despacho.
+// Marca el stock como RESERVADO (no descuenta cantidad aun, eso pasa
+// al confirmar el picking de esa linea).
+async function asignarStockAItem(itemDespachoId, stockId) {
+  const { error: errReserva } = await sb
+    .from('stock')
+    .update({ estado: 'RESERVADO', actualizado_en: new Date().toISOString() })
+    .eq('id', stockId)
+    .eq('estado', 'DISPONIBLE');
+
+  if (errReserva) console.error('Error al reservar stock:', errReserva);
+
+  const { data: stockRow } = await sb.from('stock').select('*').eq('id', stockId).single();
+
+  const { error: errItem } = await sb
+    .from('despachos_items')
+    .update({
+      stock_id: stockId,
+      paleta_pedido: stockRow ? stockRow.paleta_pedido : null,
+      ubicacion_fisica: stockRow ? stockRow.ubicacion_fisica : null,
+      encontrado: true
+    })
+    .eq('id', itemDespachoId);
+
+  if (errItem) console.error('Error al asignar stock al item:', errItem);
+
+  return { error: errItem || null, stock: stockRow };
+}
+
+// Confirma el picking de un item: descuenta la cantidad pickeada del
+// stock (que sigue RESERVADO hasta que se confirme el despacho final).
+async function confirmarPicking(itemDespachoId, stockId, cantidadPickeada, observacion = '', usuario = '') {
   const { data: stockRow, error: errGet } = await sb
     .from('stock')
     .select('*')
@@ -219,17 +323,14 @@ async function confirmarPicking(itemDespachoId, stockId, cantidadPickeada, usuar
   }
 
   const nuevaCantidad = Math.max(0, Number(stockRow.cantidad) - Number(cantidadPickeada));
-  const nuevoEstado = nuevaCantidad <= 0 ? 'DESPACHADO' : stockRow.estado;
 
-  // 2. Actualizar stock
   const { error: errUpdate } = await sb
     .from('stock')
-    .update({ cantidad: nuevaCantidad, estado: nuevoEstado, actualizado_en: new Date().toISOString() })
+    .update({ cantidad: nuevaCantidad, actualizado_en: new Date().toISOString() })
     .eq('id', stockId);
 
   if (errUpdate) return { error: errUpdate };
 
-  // 3. Registrar en kardex
   const { error: errKardex } = await sb
     .from('kardex')
     .insert([{
@@ -243,23 +344,55 @@ async function confirmarPicking(itemDespachoId, stockId, cantidadPickeada, usuar
 
   if (errKardex) console.error('Error kardex:', errKardex);
 
-  // 4. Marcar item de despacho como pickeado
+  const obsTexto = 'PICKEADO: ' + cantidadPickeada + (observacion ? ' | ' + observacion : '');
   const { error: errItem } = await sb
     .from('despachos_items')
-    .update({ observaciones: 'PICKEADO: ' + cantidadPickeada })
+    .update({ observaciones: obsTexto })
     .eq('id', itemDespachoId);
 
   if (errItem) console.error('Error item despacho:', errItem);
 
-  return { error: null, nuevaCantidad, nuevoEstado };
+  return { error: null, nuevaCantidad };
 }
 
-async function finalizarDespacho(despachoId) {
+// Paso 1 del cierre: todos los items ya se pickearon. La orden pasa
+// a PICKEADO; el stock sigue RESERVADO (el bulto puede salir otro dia).
+async function terminarPicking(despachoId) {
   const { error } = await sb
+    .from('despachos')
+    .update({ status: 'PICKEADO' })
+    .eq('id', despachoId);
+  return { error };
+}
+
+// Paso 2 del cierre: se confirma que el bulto salio del almacen
+// realmente (mismo dia o despues). Aqui se libera el stock reservado.
+async function finalizarDespacho(despachoId) {
+  const { error: errStatus } = await sb
     .from('despachos')
     .update({ status: 'DESPACHADO' })
     .eq('id', despachoId);
-  return { error };
+
+  if (errStatus) return { error: errStatus };
+
+  const { data: items, error: errItems } = await sb
+    .from('despachos_items')
+    .select('stock_id')
+    .eq('despacho_id', despachoId);
+
+  if (!errItems && items && items.length > 0) {
+    const stockIds = items.map(it => it.stock_id).filter(Boolean);
+    if (stockIds.length > 0) {
+      const { error: errStock } = await sb
+        .from('stock')
+        .update({ estado: 'DESPACHADO', actualizado_en: new Date().toISOString() })
+        .in('id', stockIds)
+        .eq('estado', 'RESERVADO');
+      if (errStock) console.error('Error al liberar stock a DESPACHADO:', errStock);
+    }
+  }
+
+  return { error: null };
 }
 
 // ============================================================
@@ -456,6 +589,119 @@ async function marcarGuiaPendienteProcesada(id, despachoId) {
   if (error) {
     console.error('Error marcarGuiaPendienteProcesada:', error);
     return { error };
+  }
+
+  return { error: null };
+}
+
+// ============================================================
+// FUNCIONES - RECEPCIONES PENDIENTES (Excel del cliente como
+// expectativa, antes de confirmar lo recibido fisicamente)
+// ============================================================
+
+async function guardarRecepcionesPendientes(pedidos) {
+  const numerosPedido = pedidos.map(p => p.pedido);
+
+  const { data: existentes, error: errBuscar } = await sb
+    .from('recepciones_pendientes')
+    .select('pedido')
+    .eq('estado', 'PENDIENTE')
+    .in('pedido', numerosPedido);
+
+  if (errBuscar) {
+    console.error('Error al verificar pedidos existentes:', errBuscar);
+    return { data: null, error: errBuscar };
+  }
+
+  const pedidosExistentes = new Set((existentes || []).map(e => e.pedido));
+  const pedidosAInsertar = pedidos.filter(p => !pedidosExistentes.has(p.pedido));
+
+  if (pedidosAInsertar.length === 0) return { data: [], error: null };
+
+  const filas = pedidosAInsertar.map(p => ({
+    pedido: p.pedido,
+    cliente: p.cliente || null,
+    fecha_esperada: p.fecha || null,
+    items: p.items,
+    estado: 'PENDIENTE'
+  }));
+
+  const { data, error } = await sb
+    .from('recepciones_pendientes')
+    .insert(filas)
+    .select();
+
+  if (error) {
+    console.error('Error guardarRecepcionesPendientes:', error);
+    return { data: null, error };
+  }
+
+  return { data, error: null };
+}
+
+async function obtenerRecepcionesPendientes() {
+  const { data, error } = await sb
+    .from('recepciones_pendientes')
+    .select('*')
+    .eq('estado', 'PENDIENTE')
+    .order('creado_en', { ascending: false });
+
+  if (error) {
+    console.error('Error obtenerRecepcionesPendientes:', error);
+    return [];
+  }
+
+  return data || [];
+}
+
+// Confirma una recepcion: ingresa a stock SOLO lo que realmente
+// llego (itemsRecibidos), usando el numero de pedido como
+// ubicacion fisica logica por defecto (igual que una paleta).
+async function confirmarRecepcion(recepcionId, pedido, cliente, itemsRecibidos) {
+  const filasStock = itemsRecibidos
+    .filter(it => it.sku && Number(it.cantidad_recibida) > 0)
+    .map(it => ({
+      sku: it.sku,
+      descripcion: it.descripcion || null,
+      serie: it.serie || null,
+      cantidad: Number(it.cantidad_recibida),
+      unidad_medida: it.unidad_medida || 'UND',
+      paleta_pedido: pedido,
+      ubicacion_fisica: pedido,
+      cliente: cliente || null,
+      tipo: it.serie ? 'SERIADO' : 'LOTIZADO',
+      estado: 'DISPONIBLE',
+      condicion: 'NUEVO'
+    }));
+
+  if (filasStock.length === 0) {
+    return { error: new Error('No hay ítems recibidos para registrar.') };
+  }
+
+  const { error: errStock } = await sb.from('stock').insert(filasStock);
+  if (errStock) {
+    console.error('Error al insertar stock de recepcion:', errStock);
+    return { error: errStock };
+  }
+
+  // Registrar en kardex cada ingreso
+  const filasKardex = filasStock.map(f => ({
+    sku: f.sku,
+    tipo_movimiento: 'INGRESO',
+    cantidad: f.cantidad,
+    referencia: pedido,
+    usuario: null
+  }));
+  const { error: errKardex } = await sb.from('kardex').insert(filasKardex);
+  if (errKardex) console.error('Error kardex recepcion:', errKardex);
+
+  // Marcar la recepcion pendiente como RECIBIDA (si vino de Excel)
+  if (recepcionId) {
+    const { error: errUpdate } = await sb
+      .from('recepciones_pendientes')
+      .update({ estado: 'RECIBIDA', items_recibidos: itemsRecibidos, procesado_en: new Date().toISOString() })
+      .eq('id', recepcionId);
+    if (errUpdate) console.error('Error al marcar recepcion como recibida:', errUpdate);
   }
 
   return { error: null };

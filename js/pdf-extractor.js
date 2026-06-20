@@ -50,6 +50,55 @@ async function extraerTextoPDF(file) {
   return textoCompleto;
 }
 
+// Extrae las palabras de la PRIMERA pagina con sus coordenadas X/Y reales,
+// sin agrupar por linea. Necesario para separar columnas que estan lado a
+// lado (ej: DOMICILIO DE PARTIDA / DOMICILIO DE LLEGADA), que al extraer
+// como texto plano por linea quedan mezcladas.
+// Nota: en PDF.js el eje Y esta invertido respecto a pdfplumber (0 abajo,
+// no arriba), por eso "mayor Y = mas arriba en la pagina" aqui.
+async function extraerPalabrasConPosicion(file) {
+  await cargarPdfJs();
+
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const page = await pdf.getPage(1);
+  const content = await page.getTextContent();
+  const viewport = page.getViewport({ scale: 1 });
+
+  const palabras = content.items.map(item => ({
+    texto: item.str,
+    x: item.transform[4],
+    y: item.transform[5]
+  })).filter(p => p.texto.trim());
+
+  return { palabras, anchoPagina: viewport.width };
+}
+
+// Extrae el DOMICILIO DE LLEGADA real (destino geografico), separandolo
+// del DOMICILIO DE PARTIDA que esta en la columna izquierda de la misma
+// fila. Validado contra 5 guias reales con formatos de direccion distintos.
+function extraerDestinoPorPosicion(palabras, anchoPagina) {
+  const mitad = anchoPagina / 2;
+
+  const wLlegada = palabras.find(p => p.texto === 'LLEGADA');
+  const wDestinatario = palabras.find(p => p.texto === 'DESTINATARIO');
+
+  if (!wLlegada || !wDestinatario) return null;
+
+  // En PDF.js, Y mayor = mas arriba. LLEGADA esta arriba del bloque de
+  // direccion, DESTINATARIO esta debajo. El rango valido es entre ambos.
+  const yTop = wLlegada.y;
+  const yBottom = wDestinatario.y;
+
+  const palabrasColumnaDerecha = palabras
+    .filter(p => p.x >= mitad && p.y < yTop && p.y > yBottom)
+    .sort((a, b) => (b.y - a.y) || (a.x - b.x));
+
+  if (palabrasColumnaDerecha.length === 0) return null;
+
+  return palabrasColumnaDerecha.map(p => p.texto).join(' ').replace(/\s+/g, ' ').trim();
+}
+
 function parsearGuiaTelrad(texto) {
   const resultado = {
     guia: null,
@@ -72,6 +121,10 @@ function parsearGuiaTelrad(texto) {
   const mSolicitud = texto.match(/SOLICITUD\s*:\s*(\S+)/i);
   if (mSolicitud) resultado.solicitud = mSolicitud[1];
 
+  // Razon social del destinatario (validado en multiples guias reales)
+  const mRazonSocial = texto.match(/RAZON SOCIAL:\s*(.+?)\s+Nombre\/Raz/);
+  if (mRazonSocial) resultado.razonSocial = mRazonSocial[1].replace(/\s+/g, ' ').trim();
+
   const lineas = texto.split('\n').map(l => l.trim()).filter(Boolean);
 
   let inicio = lineas.findIndex(l => /SEC\s*\.?\s*CANT/i.test(l));
@@ -88,11 +141,15 @@ function parsearGuiaTelrad(texto) {
   // Codigo de producto suelto en su propia linea (ej: ENT96007867)
   const patronCodigoSuelto = /^([A-Z]{2,5}\d{6,})$/;
   // Linea de item: SEC CANT UM seguido del resto (codigo y/o serie y/o descripcion)
-  const patronSecCantUm = /^(\d{1,3})\s+([\d,.]+)\s+UND\s+(.+)$/;
-  // Codigo embebido en el resto de la linea
-  const patronCodigoEmbebido = /\b([A-Z]{2,5}\d{6,})\b/;
+  const patronSecCantUm = /^(\d{1,3})\s+([\d,.]+)\s+(UND|MT|MTS|M)\s+(.+)$/;
+  // Primer token del "resto": puede ser el CODIGO real (ENT96007867,
+  // o numerico puro como 1004177 para SKU propios de Telrad)
+  const patronPrimerToken = /^(\S+)\s+(.*)$/;
   // Serie: token largo alfanumerico al final de la linea
   const patronSerieFinal = /\b(\d{6,}[A-Z0-9]{4,}|\d{15,})\b\s*$/;
+  // Identificador de pedido/paleta al inicio de lo que queda despues
+  // del codigo (ej: "MR-304", "Q&S-TELRAD", o numero de pedido largo)
+  const patronIdentificador = /^([A-Z][A-Z&]*-[A-Z0-9]+|\d{7,})\s+/;
 
   let codigoPendiente = null;
 
@@ -107,21 +164,22 @@ function parsearGuiaTelrad(texto) {
     const m = linea.match(patronSecCantUm);
     if (!m) continue;
 
-    const [, sec, cantStr, resto] = m;
+    const [, sec, cantStr, um, restoCompleto] = m;
     let codigo = codigoPendiente;
     let serie = null;
-    let descripcion = resto;
+    let resto = restoCompleto;
 
-    const mCod = resto.match(patronCodigoEmbebido);
-    if (mCod) {
-      if (!codigo) {
-        codigo = mCod[1];
-        descripcion = resto.replace(mCod[0], '').trim();
-      } else {
-        serie = mCod[1];
-        descripcion = resto.replace(mCod[0], '').trim();
+    // Si no hay codigo pendiente de la linea anterior, el primer token
+    // de "resto" es el codigo real (sea ENT... o numerico puro)
+    if (!codigo) {
+      const mTok = resto.match(patronPrimerToken);
+      if (mTok) {
+        codigo = mTok[1];
+        resto = mTok[2];
       }
     }
+
+    let descripcion = resto;
 
     if (!serie) {
       const mSerie = descripcion.match(patronSerieFinal);
@@ -131,11 +189,22 @@ function parsearGuiaTelrad(texto) {
       }
     }
 
+    // Identificador de pedido al inicio de lo que queda (despues del
+    // codigo, antes de la descripcion en si)
+    let identificadorPedido = null;
+    const mIdent = descripcion.match(patronIdentificador);
+    if (mIdent) {
+      identificadorPedido = mIdent[1];
+      descripcion = descripcion.slice(mIdent[0].length).trim();
+    }
+
     resultado.items.push({
       sec: Number(sec),
       cantidad: Number(cantStr.replace(/,/g, '')),
+      um: um,
       codigo: codigo || null,
       serie: serie || null,
+      identificadorPedido: identificadorPedido,
       descripcion: descripcion.trim()
     });
 
@@ -155,6 +224,19 @@ async function procesarGuiaPDF(file) {
   try {
     const texto = await extraerTextoPDF(file);
     const datos = parsearGuiaTelrad(texto);
+
+    // Destino geografico real: requiere coordenadas X/Y (no texto plano),
+    // por eso se extrae aparte y se agrega al resultado.
+    try {
+      const { palabras, anchoPagina } = await extraerPalabrasConPosicion(file);
+      const destino = extraerDestinoPorPosicion(palabras, anchoPagina);
+      if (destino) datos.destino = destino;
+    } catch (eDestino) {
+      // Si falla la extraccion de destino, no bloquea el resto del
+      // procesamiento; el campo simplemente queda sin completar.
+      console.error('No se pudo extraer destino por posicion:', eDestino);
+    }
+
     return { data: datos, error: null };
   } catch (e) {
     return { data: null, error: e.message || 'Error al leer el PDF' };
