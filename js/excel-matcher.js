@@ -277,7 +277,9 @@ const COLUMNAS_GENERICO = {
   'SERIE': 'serie',
   'PEDIDO': 'pedido', 'N PEDIDO': 'pedido', 'NRO PEDIDO': 'pedido',
   'CLIENTE': 'cliente',
-  'DESTINO': 'destino'
+  'DESTINO': 'destino',
+  'RAZON_SOCIAL': 'razon_social', 'RAZON SOCIAL': 'razon_social',
+  'CONTRATA': 'contrata'
 };
 
 function detectarEncabezadosGenerico(filas) {
@@ -337,7 +339,9 @@ async function agruparGuiasGenerico(file) {
         guias[grStr].cabecera = {
           cliente: colMap.cliente !== undefined && fila[colMap.cliente] ? String(fila[colMap.cliente]).trim() : null,
           destino: colMap.destino !== undefined && fila[colMap.destino] ? String(fila[colMap.destino]).trim() : null,
-          razon_social: null, agencia: null, consignatario_1: null, consignatario_2: null
+          razon_social: colMap.razon_social !== undefined && fila[colMap.razon_social] ? String(fila[colMap.razon_social]).trim() : null,
+          contrata: colMap.contrata !== undefined && fila[colMap.contrata] ? String(fila[colMap.contrata]).trim() : null,
+          agencia: null, consignatario_1: null, consignatario_2: null
         };
       }
     }

@@ -171,7 +171,7 @@ const NuevoPickingView = {
   renderModoExcel(body) {
     body.innerHTML = `
       <div class="format-guide">
-        <p class="format-guide-title">El Excel debe tener estas columnas (en la primera fila):</p>
+        <p class="format-guide-title">Opción 1 — Excel genérico (columnas en la primera fila):</p>
         <table class="format-guide-table">
           <tr><td><strong>GR</strong></td><td>Número de guía</td></tr>
           <tr><td><strong>SKU</strong></td><td>Código del producto</td></tr>
@@ -181,12 +181,23 @@ const NuevoPickingView = {
           <tr><td><strong>PEDIDO</strong></td><td>Si aplica (opcional)</td></tr>
           <tr><td><strong>CLIENTE</strong></td><td>Opcional</td></tr>
           <tr><td><strong>DESTINO</strong></td><td>Opcional</td></tr>
+          <tr><td><strong>RAZON_SOCIAL</strong></td><td>Opcional (destinatario)</td></tr>
+          <tr><td><strong>CONTRATA</strong></td><td>Opcional</td></tr>
         </table>
         <p class="format-guide-note">El resto de columnas que traiga el archivo se ignoran. Si el Excel trae varias guías mezcladas, se separan automáticamente por GR.</p>
       </div>
-      <button class="btn-primary" id="btn-subir-excel-masivo" style="width:auto; padding:9px 18px;">Seleccionar archivo Excel</button>
+      <button class="btn-primary" id="btn-subir-excel-masivo" style="width:auto; padding:9px 18px;">Seleccionar archivo (genérico)</button>
       <input type="file" id="input-excel-masivo" accept=".xlsx,.xls" style="display:none;" />
       <div id="masivo-status"></div>
+
+      <div style="margin-top:16px; padding-top:14px; border-top:1px solid var(--border);">
+        <p class="format-guide-title" style="margin-bottom:8px;">Opción 2 — Excel de cadena de suministro</p>
+        <p style="font-size:11px; color:var(--text-secondary); margin:0 0 10px;">Sube el archivo de programación tal cual te lo manda cadena (sin borrar columnas ni hojas). El sistema busca solo la hoja "Despacho" y sus columnas reales.</p>
+        <button class="btn-primary" id="btn-subir-excel-cadena" style="width:auto; padding:9px 18px;">Seleccionar archivo (cadena)</button>
+        <input type="file" id="input-excel-cadena" accept=".xlsx,.xls" style="display:none;" />
+        <div id="cadena-status"></div>
+      </div>
+
       <div id="lista-pendientes-cont"></div>
     `;
 
@@ -195,6 +206,14 @@ const NuevoPickingView = {
       const file = e.target.files[0];
       if (!file) return;
       await this.subirExcelMasivo(file);
+      e.target.value = '';
+    });
+
+    document.getElementById('btn-subir-excel-cadena').addEventListener('click', () => document.getElementById('input-excel-cadena').click());
+    document.getElementById('input-excel-cadena').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      await this.subirExcelCadena(file);
       e.target.value = '';
     });
 
@@ -212,6 +231,24 @@ const NuevoPickingView = {
       return;
     }
 
+    await this.guardarYMostrarResultado(guias, statusEl);
+  },
+
+  async subirExcelCadena(file) {
+    const statusEl = document.getElementById('cadena-status');
+    statusEl.innerHTML = `<p class="status-msg status-loading">Leyendo Excel...</p>`;
+
+    const { data: guias, error } = await agruparTodasLasGuiasDeExcel(file);
+
+    if (error || !guias) {
+      statusEl.innerHTML = `<p class="status-msg status-error">${escapeHtml(error || 'Error al leer el archivo.')}</p>`;
+      return;
+    }
+
+    await this.guardarYMostrarResultado(guias, statusEl);
+  },
+
+  async guardarYMostrarResultado(guias, statusEl) {
     const { data: guardadas, error: errGuardar } = await guardarGuiasPendientes(guias);
 
     if (errGuardar) {

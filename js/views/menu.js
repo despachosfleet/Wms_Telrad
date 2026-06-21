@@ -154,14 +154,61 @@ const MenuView = {
 
   render() {
     return `
-      <div class="welcome-screen">
-        <p class="welcome-text">Selecciona un módulo arriba para empezar.</p>
+      <div class="dashboard-stats" id="dashboard-stats">
+        <div class="stat-card"><div class="stat-value">…</div><div class="stat-label">Órdenes pendientes</div></div>
+        <div class="stat-card"><div class="stat-value">…</div><div class="stat-label">Guías en espera</div></div>
+        <div class="stat-card"><div class="stat-value">…</div><div class="stat-label">Pedidos por recibir</div></div>
+      </div>
+
+      <p class="section-label">Accesos rápidos</p>
+      <div class="menu-grid">
+        <button class="menu-item" data-nav="nuevo-despacho">
+          <span>Nueva orden de picking</span>
+          <small>Subir PDF de la guía o cargar Excel masivo</small>
+        </button>
+        <button class="menu-item" data-nav="picking-lista">
+          <span>Órdenes de picking</span>
+          <small>Pendientes, en proceso, pickeadas y despachadas</small>
+        </button>
+        <button class="menu-item" data-nav="consulta">
+          <span>Consultar stock</span>
+          <small>Buscar por SKU, serie, paleta o ubicación</small>
+        </button>
+        <button class="menu-item" data-nav="recepcion">
+          <span>Recepción</span>
+          <small>Subir Excel del cliente o registrar ingreso manual</small>
+        </button>
       </div>
     `;
   },
 
-  afterRender() {
+  async afterRender() {
     renderBarraModulos();
+    document.querySelectorAll('[data-nav]').forEach(btn => {
+      btn.addEventListener('click', () => Router.navigate(btn.dataset.nav));
+    });
+    this.cargarEstadisticas();
+  },
+
+  async cargarEstadisticas() {
+    const [despachos, guiasPendientes, recepciones] = await Promise.all([
+      obtenerTodosLosDespachos({}),
+      obtenerGuiasPendientes({ estado: 'PENDIENTE' }),
+      obtenerRecepcionesPendientes()
+    ]);
+
+    const ordenesPendientes = despachos.filter(d => {
+      const estado = calcularEstadoVisual(d);
+      return estado === 'PENDIENTE' || estado === 'EN_PROCESO';
+    }).length;
+
+    const cont = document.getElementById('dashboard-stats');
+    if (!cont) return;
+    cont.innerHTML = `
+      <div class="stat-card"><div class="stat-value">${ordenesPendientes}</div><div class="stat-label">Órdenes pendientes</div></div>
+      <div class="stat-card"><div class="stat-value">${guiasPendientes.length}</div><div class="stat-label">Guías en espera</div></div>
+      <div class="stat-card"><div class="stat-value">${recepciones.length}</div><div class="stat-label">Pedidos por recibir</div></div>
+    `;
   }
 };
 
