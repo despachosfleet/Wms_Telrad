@@ -12,7 +12,7 @@ const KardexView = {
         <div class="field-grid">
           <div class="field">
             <label>SKU</label>
-            <input type="text" id="kx-sku" placeholder="Filtrar por SKU" />
+            <input type="text" id="kx-sku" placeholder="" />
           </div>
           <div class="field">
             <label>Tipo de movimiento</label>

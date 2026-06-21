@@ -15,19 +15,23 @@ const ConsultaView = {
         <div class="field-grid">
           <div class="field">
             <label>SKU</label>
-            <input type="text" id="f-sku" placeholder="Ej: ENT96007432" />
+            <input type="text" id="f-sku" placeholder="" />
           </div>
           <div class="field">
             <label>Serie</label>
-            <input type="text" id="f-serie" placeholder="Opcional" />
+            <input type="text" id="f-serie" placeholder="" />
           </div>
           <div class="field">
             <label>Ubicación</label>
-            <input type="text" id="f-ubic" placeholder="Ej: B-01-03" />
+            <input type="text" id="f-ubic" placeholder="" />
           </div>
           <div class="field">
             <label>Paleta/Pedido</label>
-            <input type="text" id="f-paleta" placeholder="Ej: PALETA 160" />
+            <input type="text" id="f-paleta" placeholder="" />
+          </div>
+          <div class="field">
+            <label>Descripción</label>
+            <input type="text" id="f-descripcion" placeholder="" />
           </div>
           <div class="field">
             <label>Cliente</label>
@@ -68,7 +72,7 @@ const ConsultaView = {
     document.getElementById('btn-limpiar').addEventListener('click', () => this.limpiar());
 
     // Enter en cualquier campo de texto dispara la busqueda
-    ['f-sku','f-serie','f-ubic','f-paleta'].forEach(id => {
+    ['f-sku','f-serie','f-ubic','f-paleta','f-descripcion'].forEach(id => {
       document.getElementById(id).addEventListener('keydown', (e) => {
         if (e.key === 'Enter') this.buscar();
       });
@@ -76,7 +80,7 @@ const ConsultaView = {
   },
 
   limpiar() {
-    ['f-sku','f-serie','f-ubic','f-paleta'].forEach(id => document.getElementById(id).value = '');
+    ['f-sku','f-serie','f-ubic','f-paleta','f-descripcion'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('f-cliente').value = '';
     document.getElementById('f-estado').value = '';
     document.getElementById('resultados').innerHTML = '';
@@ -89,6 +93,7 @@ const ConsultaView = {
     const serie = document.getElementById('f-serie').value.trim();
     const ubic = document.getElementById('f-ubic').value.trim();
     const paleta = document.getElementById('f-paleta').value.trim();
+    const descripcion = document.getElementById('f-descripcion').value.trim();
     const cliente = document.getElementById('f-cliente').value;
     const estado = document.getElementById('f-estado').value;
 
@@ -97,7 +102,7 @@ const ConsultaView = {
 
     cont.innerHTML = '<div class="loading">Buscando...</div>';
 
-    const { data, error } = await buscarStockAvanzado({ sku, serie, ubic, paleta, cliente, estado, orden: this._orden, dir: this._dir, limit: 200 });
+    const { data, error } = await buscarStockAvanzado({ sku, serie, ubic, paleta, descripcion, cliente, estado, orden: this._orden, dir: this._dir, limit: 200 });
 
     if (error) {
       cont.innerHTML = '<div class="empty-state">Error al conectar con la base de datos.</div>';
@@ -160,6 +165,7 @@ const ConsultaView = {
           <td colspan="7" style="padding:0;">
             <div class="row-detail-panel">
               <div class="row-detail-grid">
+                <div style="grid-column: span 2;"><div class="item-label">Descripción</div><div class="item-value">${escapeHtml(item.descripcion || 'Sin descripción')}</div></div>
                 <div><div class="item-label">Serie</div><div class="item-value">${escapeHtml(item.serie || 'Sin serie')}</div></div>
                 <div><div class="item-label">Tipo</div><div class="item-value">${escapeHtml(item.tipo || '-')}</div></div>
                 <div><div class="item-label">Fecha ingreso</div><div class="item-value">${escapeHtml(item.fecha_ingreso || '-')}</div></div>

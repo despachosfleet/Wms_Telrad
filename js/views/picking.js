@@ -111,23 +111,18 @@ const PickingListaView = {
     cont.innerHTML = `
       <div class="table-wrap">
         <table class="data-table">
-          <thead><tr><th>GR</th><th>Cliente</th><th>Destino</th><th>Ítems</th><th>Estado</th></tr></thead>
+          <thead><tr><th>GR</th><th>Destino</th><th>Destinatario</th><th>Cliente</th><th>Ítems</th><th>Estado</th><th></th><th></th></tr></thead>
           <tbody>
-            ${lista.map((d, i) => `
-              <tr data-idx="${i}">
+            ${lista.map(d => `
+              <tr>
                 <td class="sku-cell">${escapeHtml(d.gr || 'Sin GR')}</td>
-                <td>${escapeHtml(d.cliente || '-')}</td>
                 <td class="wrap">${escapeHtml(d.destino || '-')}</td>
+                <td class="wrap">${escapeHtml(d.razon_social || '-')}</td>
+                <td>${escapeHtml(d.cliente || '-')}</td>
                 <td>${(d.despachos_items || []).length}</td>
                 <td>${pillEstado(d._estadoVisual)}</td>
-              </tr>
-              <tr class="detail-row-tr" data-detail-for="${i}" style="display:none;">
-                <td colspan="5">
-                  <div style="padding:10px 4px;">
-                    <p style="font-size:11px; color:var(--text-secondary); margin:0 0 8px;">Fecha: ${escapeHtml(d.fecha || '-')} · Contrata: ${escapeHtml(d.contrata || '-')}</p>
-                    <button class="btn-primary" data-ir-picking="${d.id}" style="width:auto; padding:8px 16px;">Ir a pickear</button>
-                  </div>
-                </td>
+                <td><button class="btn-text" data-ver-detalle="${d.id}">Ver detalle</button></td>
+                <td><button class="btn-text" data-picar="${d.id}">Picar</button></td>
               </tr>
             `).join('')}
           </tbody>
@@ -135,24 +130,83 @@ const PickingListaView = {
       </div>
     `;
 
-    cont.querySelectorAll('tbody tr[data-idx]').forEach(tr => {
-      tr.addEventListener('click', (e) => {
-        if (e.target.closest('[data-ir-picking]')) return;
-        const idx = tr.dataset.idx;
-        const detailTr = cont.querySelector(`tr[data-detail-for="${idx}"]`);
-        const isOpen = detailTr.style.display !== 'none';
-        cont.querySelectorAll('.detail-row-tr').forEach(d => d.style.display = 'none');
-        detailTr.style.display = isOpen ? 'none' : '';
-      });
+    cont.querySelectorAll('[data-ver-detalle]').forEach(btn => {
+      btn.addEventListener('click', () => Router.navigate('picking-detalle', { despachoId: btn.dataset.verDetalle }));
     });
-
-    cont.querySelectorAll('[data-ir-picking]').forEach(btn => {
-      btn.addEventListener('click', () => Router.navigate('picking', { despachoId: btn.dataset.irPicking }));
+    cont.querySelectorAll('[data-picar]').forEach(btn => {
+      btn.addEventListener('click', () => Router.navigate('picking', { despachoId: btn.dataset.picar }));
     });
   }
 };
 
 Router.register('picking-lista', PickingListaView);
+
+// ============================================================
+// DETALLE DE ORDEN: lista completa de items (SKU, descripcion,
+// cantidad, serie, pedido) antes de empezar a pickear. Boton
+// "Picar" arriba lleva a la pantalla real de pickeo por lineas.
+// ============================================================
+const PickingDetalleView = {
+  title: 'Detalle de la orden',
+  _despacho: null,
+  _items: [],
+
+  render() {
+    return `<div id="detalle-content"></div>`;
+  },
+
+  async afterRender(params) {
+    const { despacho, items } = await obtenerDespachoConItems(params.despachoId);
+    const cont = document.getElementById('detalle-content');
+
+    if (!despacho) {
+      cont.innerHTML = '<div class="empty-state">No se pudo cargar el despacho.</div>';
+      return;
+    }
+
+    this._despacho = despacho;
+    this._items = items;
+    const estadoVisual = calcularEstadoVisual({ ...despacho, despachos_items: items });
+
+    cont.innerHTML = `
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
+          <div>
+            <p class="card-title" style="margin:0;">${escapeHtml(despacho.gr || 'Sin GR')}</p>
+            <p style="font-size:11px; color:var(--text-secondary); margin:4px 0 0;">
+              Destino: ${escapeHtml(despacho.destino || '-')} · Destinatario: ${escapeHtml(despacho.razon_social || '-')} · Cliente: ${escapeHtml(despacho.cliente || '-')}
+            </p>
+          </div>
+          <button class="btn-primary" id="btn-picar-detalle" style="width:auto; padding:9px 18px;">Picar</button>
+        </div>
+        <div style="margin-top:8px;">${pillEstado(estadoVisual)}</div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>SKU</th><th>Descripción</th><th>Cantidad</th><th>Serie</th><th>Pedido</th></tr></thead>
+          <tbody>
+            ${items.map(it => `
+              <tr>
+                <td class="sku-cell">${escapeHtml(it.sku || '-')}</td>
+                <td class="wrap">${escapeHtml(it.descripcion || '-')}</td>
+                <td>${formatNum(it.cantidad)}</td>
+                <td>${escapeHtml(it.serie || '-')}</td>
+                <td>${escapeHtml(it.paleta_pedido || '-')}</td>
+              </tr>
+            `).join('') || '<tr><td colspan="5" class="empty-state">Sin ítems</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    document.getElementById('btn-picar-detalle').addEventListener('click', () => {
+      Router.navigate('picking', { despachoId: despacho.id });
+    });
+  }
+};
+
+Router.register('picking-detalle', PickingDetalleView);
 
 // ============================================================
 // PICKING POR LINEAS: ver todos los items a la vez, trabajar
@@ -242,15 +296,16 @@ const PickingView = {
       const { data: stockActual } = await sb.from('stock').select('*').eq('id', item.stock_id).single();
       if (stockActual) opciones = [stockActual];
     } else {
-      const resultado = await buscarStockParaItem(item.sku, item.paleta_pedido);
+      const resultado = await buscarStockParaItem(item.sku, item.paleta_pedido, item.serie);
       opciones = resultado.data;
       origen = resultado.origen;
     }
 
     if (opciones.length === 0) {
+      const esPorSerie = origen === 'POR_REVISAR';
       detalleEl.innerHTML = `
-        <div class="pill pill-danger" style="margin-bottom:8px;">Sin stock identificado — revisar manual</div>
-        <p style="font-size:11px; color:var(--text-secondary);">No se encontró por pedido ni por SKU. Verifica el SKU o asigna manualmente desde Movimientos.</p>
+        <div class="pill pill-danger" style="margin-bottom:8px;">${esPorSerie ? 'Serie no encontrada — revisar manual' : 'Sin stock identificado — revisar manual'}</div>
+        <p style="font-size:11px; color:var(--text-secondary);">${esPorSerie ? `La serie "${escapeHtml(item.serie || '')}" no se encontró en stock disponible. No se sugiere otra unidad del mismo SKU porque la guía exige esta serie exacta.` : 'No se encontró por pedido ni por SKU. Verifica el SKU o asigna manualmente desde Movimientos.'}</p>
       `;
       return;
     }
@@ -272,7 +327,7 @@ const PickingView = {
         </div>
         <div class="field">
           <label>Observación</label>
-          <input type="text" id="obs-pickeada-${index}" placeholder="Opcional" />
+          <input type="text" id="obs-pickeada-${index}" placeholder="" />
         </div>
       </div>
       <button class="btn-primary" id="btn-confirmar-item-${index}" style="margin-top:10px;">Confirmar este ítem</button>
@@ -350,7 +405,7 @@ Router.register('picking', PickingView);
 // ============================================================
 const DespachosSalidasView = {
   title: 'Despachos y salidas',
-  _filtroEstado: 'PICKEADO',
+  _filtroEstado: 'TODOS',
   _filtroFecha: 'TODAS',
   _despachos: [],
 
@@ -361,6 +416,7 @@ const DespachosSalidasView = {
         <div class="chips" id="chips-fecha-desp" style="margin-top:8px;"></div>
       </div>
       <div id="lista-despachos-cont"></div>
+      <div id="modal-despachar-cont"></div>
     `;
   },
 
@@ -370,8 +426,7 @@ const DespachosSalidasView = {
   },
 
   renderChips() {
-    const estadosRelevantes = ESTADOS_FILTRO.filter(e => ['TODOS', 'PICKEADO', 'DESPACHADO'].includes(e.valor));
-    document.getElementById('chips-estado-desp').innerHTML = estadosRelevantes.map(e => `
+    document.getElementById('chips-estado-desp').innerHTML = ESTADOS_FILTRO.map(e => `
       <button class="chip ${this._filtroEstado === e.valor ? 'active' : ''}" data-estado-d="${e.valor}">${e.label}</button>
     `).join('');
     document.getElementById('chips-fecha-desp').innerHTML = FECHAS_FILTRO.map(f => `
@@ -404,9 +459,7 @@ const DespachosSalidasView = {
 
   renderLista() {
     const cont = document.getElementById('lista-despachos-cont');
-    let lista = this._despachos
-      .map(d => ({ ...d, _estadoVisual: calcularEstadoVisual(d) }))
-      .filter(d => d._estadoVisual === 'PICKEADO' || d._estadoVisual === 'DESPACHADO');
+    let lista = this._despachos.map(d => ({ ...d, _estadoVisual: calcularEstadoVisual(d) }));
 
     if (this._filtroEstado !== 'TODOS') {
       lista = lista.filter(d => d._estadoVisual === this._filtroEstado);
@@ -420,22 +473,17 @@ const DespachosSalidasView = {
     cont.innerHTML = `
       <div class="table-wrap">
         <table class="data-table">
-          <thead><tr><th>GR</th><th>Cliente</th><th>Destino</th><th>Estado</th><th></th></tr></thead>
+          <thead><tr><th>GR</th><th>Destino</th><th>Destinatario</th><th>Cliente</th><th>Estado</th><th></th><th></th></tr></thead>
           <tbody>
-            ${lista.map((d, i) => `
-              <tr data-idx="${i}">
+            ${lista.map(d => `
+              <tr>
                 <td class="sku-cell">${escapeHtml(d.gr || 'Sin GR')}</td>
-                <td>${escapeHtml(d.cliente || '-')}</td>
                 <td class="wrap">${escapeHtml(d.destino || '-')}</td>
+                <td class="wrap">${escapeHtml(d.razon_social || '-')}</td>
+                <td>${escapeHtml(d.cliente || '-')}</td>
                 <td>${pillEstado(d._estadoVisual)}</td>
-                <td>${d._estadoVisual === 'PICKEADO' ? `<button class="btn-text" data-despachar="${d.id}">🚛 Despachar</button>` : ''}</td>
-              </tr>
-              <tr class="detail-row-tr" data-detail-for="${i}" style="display:none;">
-                <td colspan="5">
-                  <div style="padding:10px 4px; font-size:11px; color:var(--text-secondary);">
-                    Fecha: ${escapeHtml(d.fecha || '-')} · Contrata: ${escapeHtml(d.contrata || '-')} · Ítems: ${(d.despachos_items || []).length}
-                  </div>
-                </td>
+                <td><button class="btn-text" data-ver-detalle-desp="${d.id}">Ver detalle</button></td>
+                <td>${d._estadoVisual === 'PICKEADO' ? `<button class="btn-despachar-sq" data-despachar="${d.id}">🚛 Despachar</button>` : ''}</td>
               </tr>
             `).join('')}
           </tbody>
@@ -443,24 +491,38 @@ const DespachosSalidasView = {
       </div>
     `;
 
-    cont.querySelectorAll('tbody tr[data-idx]').forEach(tr => {
-      tr.addEventListener('click', (e) => {
-        if (e.target.closest('[data-despachar]')) return;
-        const idx = tr.dataset.idx;
-        const detailTr = cont.querySelector(`tr[data-detail-for="${idx}"]`);
-        const isOpen = detailTr.style.display !== 'none';
-        cont.querySelectorAll('.detail-row-tr').forEach(d => d.style.display = 'none');
-        detailTr.style.display = isOpen ? 'none' : '';
-      });
+    cont.querySelectorAll('[data-ver-detalle-desp]').forEach(btn => {
+      btn.addEventListener('click', () => Router.navigate('picking-detalle', { despachoId: btn.dataset.verDetalleDesp }));
     });
 
     cont.querySelectorAll('[data-despachar]').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        if (!confirm('¿Confirmas que este bulto ya salió del almacén?')) return;
-        await finalizarDespacho(Number(btn.dataset.despachar));
-        await this.cargarYRender();
-      });
+      btn.addEventListener('click', () => this.abrirModalDespachar(Number(btn.dataset.despachar)));
+    });
+  },
+
+  abrirModalDespachar(despachoId) {
+    const modalCont = document.getElementById('modal-despachar-cont');
+    modalCont.innerHTML = `
+      <div class="modal-overlay" id="modal-overlay-despachar">
+        <div class="modal-box">
+          <p class="modal-title">Confirmar despacho</p>
+          <p class="modal-text">¿Confirmas que este bulto ya salió del almacén?</p>
+          <div class="modal-actions">
+            <button class="btn-modal-secundario" id="btn-modal-cancelar">Cancelar</button>
+            <button class="btn-modal-primario" id="btn-modal-aceptar">Aceptar</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('modal-overlay-despachar').addEventListener('click', (e) => {
+      if (e.target.id === 'modal-overlay-despachar') modalCont.innerHTML = '';
+    });
+    document.getElementById('btn-modal-cancelar').addEventListener('click', () => { modalCont.innerHTML = ''; });
+    document.getElementById('btn-modal-aceptar').addEventListener('click', async () => {
+      modalCont.innerHTML = '';
+      await finalizarDespacho(despachoId);
+      await this.cargarYRender();
     });
   }
 };

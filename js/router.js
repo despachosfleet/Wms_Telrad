@@ -25,6 +25,10 @@ const Router = {
     title.textContent = view.title || 'Almacén Fleet';
     backBtn.style.display = name === 'menu' ? 'none' : 'flex';
 
+    if (typeof sincronizarModuloActivo === 'function') {
+      sincronizarModuloActivo(name);
+    }
+
     main.innerHTML = view.render(params);
 
     if (view.afterRender) {

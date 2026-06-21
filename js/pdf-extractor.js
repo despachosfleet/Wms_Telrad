@@ -17,16 +17,33 @@ async function cargarPdfJs() {
   _pdfjsLoaded = true;
 }
 
-async function extraerTextoPDF(file) {
+// Carga el PDF UNA SOLA VEZ y devuelve tanto el texto agrupado por
+// linea como las palabras con su posicion X/Y (primera pagina), para
+// no abrir el archivo dos veces (evita fallos silenciosos al volver
+// a leer el mismo File).
+async function cargarYExtraerTodo(file) {
   await cargarPdfJs();
 
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
   let textoCompleto = '';
+  let palabrasPrimeraPagina = [];
+  let anchoPrimeraPagina = 0;
+
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
+
+    if (i === 1) {
+      const viewport = page.getViewport({ scale: 1 });
+      anchoPrimeraPagina = viewport.width;
+      palabrasPrimeraPagina = content.items.map(item => ({
+        texto: item.str,
+        x: item.transform[4],
+        y: item.transform[5]
+      })).filter(p => p.texto.trim());
+    }
 
     const lineas = {};
     content.items.forEach(item => {
@@ -47,36 +64,12 @@ async function extraerTextoPDF(file) {
     });
   }
 
-  return textoCompleto;
-}
-
-// Extrae las palabras de la PRIMERA pagina con sus coordenadas X/Y reales,
-// sin agrupar por linea. Necesario para separar columnas que estan lado a
-// lado (ej: DOMICILIO DE PARTIDA / DOMICILIO DE LLEGADA), que al extraer
-// como texto plano por linea quedan mezcladas.
-// Nota: en PDF.js el eje Y esta invertido respecto a pdfplumber (0 abajo,
-// no arriba), por eso "mayor Y = mas arriba en la pagina" aqui.
-async function extraerPalabrasConPosicion(file) {
-  await cargarPdfJs();
-
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  const page = await pdf.getPage(1);
-  const content = await page.getTextContent();
-  const viewport = page.getViewport({ scale: 1 });
-
-  const palabras = content.items.map(item => ({
-    texto: item.str,
-    x: item.transform[4],
-    y: item.transform[5]
-  })).filter(p => p.texto.trim());
-
-  return { palabras, anchoPagina: viewport.width };
+  return { texto: textoCompleto, palabras: palabrasPrimeraPagina, anchoPagina: anchoPrimeraPagina };
 }
 
 // Extrae el DOMICILIO DE LLEGADA real (destino geografico), separandolo
 // del DOMICILIO DE PARTIDA que esta en la columna izquierda de la misma
-// fila. Validado contra 5 guias reales con formatos de direccion distintos.
+// fila. Validado contra 6+ guias reales con formatos de direccion distintos.
 function extraerDestinoPorPosicion(palabras, anchoPagina) {
   const mitad = anchoPagina / 2;
 
@@ -222,20 +215,11 @@ function parsearGuiaTelrad(texto) {
 
 async function procesarGuiaPDF(file) {
   try {
-    const texto = await extraerTextoPDF(file);
+    const { texto, palabras, anchoPagina } = await cargarYExtraerTodo(file);
     const datos = parsearGuiaTelrad(texto);
 
-    // Destino geografico real: requiere coordenadas X/Y (no texto plano),
-    // por eso se extrae aparte y se agrega al resultado.
-    try {
-      const { palabras, anchoPagina } = await extraerPalabrasConPosicion(file);
-      const destino = extraerDestinoPorPosicion(palabras, anchoPagina);
-      if (destino) datos.destino = destino;
-    } catch (eDestino) {
-      // Si falla la extraccion de destino, no bloquea el resto del
-      // procesamiento; el campo simplemente queda sin completar.
-      console.error('No se pudo extraer destino por posicion:', eDestino);
-    }
+    const destino = extraerDestinoPorPosicion(palabras, anchoPagina);
+    if (destino) datos.destino = destino;
 
     return { data: datos, error: null };
   } catch (e) {

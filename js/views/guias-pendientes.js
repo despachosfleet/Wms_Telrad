@@ -14,7 +14,7 @@ const GuiasPendientesView = {
         <p class="card-title">¿No tienes Excel para esta guía?</p>
         <p style="font-size:11px; color:var(--text-secondary); margin:0 0 10px;">Agrega el GR manualmente y resuélvela solo con el PDF.</p>
         <div style="display:flex; gap:8px;">
-          <input type="text" id="f-gr-manual" placeholder="T022-0000000132" style="flex:1; border:1.5px solid var(--border-strong); border-radius:var(--radius-sm); padding:7px 9px; font-size:12.5px;" />
+          <input type="text" id="f-gr-manual" placeholder="" style="flex:1; border:1.5px solid var(--border-strong); border-radius:var(--radius-sm); padding:7px 9px; font-size:12.5px;" />
           <button class="btn-primary" id="btn-agregar-manual" style="width:auto; padding:0 16px;">Agregar</button>
         </div>
         <div id="manual-status"></div>

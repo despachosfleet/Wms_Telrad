@@ -39,7 +39,17 @@ const RecepcionView = {
     cont.innerHTML = `
       <div class="card">
         <p class="card-title">Subir Excel del cliente</p>
-        <p style="font-size:11px; color:var(--text-secondary); margin:0 0 10px;">Sube el Excel que te manda el cliente (pedido, SKU, descripción, cantidad esperada). Esto solo crea la lista de espera — no ingresa nada a stock todavía.</p>
+        <p style="font-size:11px; color:var(--text-secondary); margin:0 0 10px;">Sube el Excel que te manda el cliente. Esto solo crea la lista de espera — no ingresa nada a stock todavía.</p>
+        <div class="format-guide">
+          <p class="format-guide-title">El Excel debe tener estas columnas (en la primera fila):</p>
+          <table class="format-guide-table">
+            <tr><td><strong>PEDIDO</strong></td><td>Número de pedido del cliente</td></tr>
+            <tr><td><strong>SKU</strong></td><td>Código del producto</td></tr>
+            <tr><td><strong>DESCRIPCION</strong></td><td>Descripción del producto</td></tr>
+            <tr><td><strong>CANTIDAD</strong></td><td>Cantidad esperada</td></tr>
+          </table>
+          <p class="format-guide-note">El resto de columnas que traiga el archivo se ignoran. Solo debe haber 1 fila por SKU/pedido.</p>
+        </div>
         <button class="btn-primary" id="btn-subir-excel-recepcion">Seleccionar archivo Excel</button>
         <input type="file" id="input-excel-recepcion" accept=".xlsx,.xls" style="display:none;" />
         <div id="rec-excel-status" style="margin-top:8px;"></div>
@@ -165,13 +175,13 @@ const RecepcionView = {
           <div class="field">
             <label>Serie (opcional)</label>
             <div style="display:flex; gap:6px;">
-              <input type="text" value="${escapeHtml(it.serie)}" data-i="${i}" data-f="serie" placeholder="Escribe o escanea" style="flex:1;" />
+              <input type="text" value="${escapeHtml(it.serie)}" data-i="${i}" data-f="serie" placeholder="" style="flex:1;" />
               <button class="btn-text" data-scan="${i}" style="white-space:nowrap;">📷</button>
             </div>
           </div>
           <div class="field" style="grid-column: span 2;">
             <label>Observación</label>
-            <input type="text" value="${escapeHtml(it.observacion)}" data-i="${i}" data-f="observacion" placeholder="Opcional (ej: llegó dañado, faltante)" />
+            <input type="text" value="${escapeHtml(it.observacion)}" data-i="${i}" data-f="observacion" placeholder="" />
           </div>
         </div>
       </div>
@@ -242,11 +252,11 @@ const RecepcionView = {
         <div class="field-grid">
           <div class="field" style="grid-column: span 2;">
             <label>SKU *</label>
-            <input type="text" id="r-sku" placeholder="Código del material" />
+            <input type="text" id="r-sku" placeholder="" />
           </div>
           <div class="field" style="grid-column: span 2;">
             <label>Descripción</label>
-            <input type="text" id="r-descripcion" placeholder="Descripción del producto" />
+            <input type="text" id="r-descripcion" placeholder="" />
           </div>
           <div class="field">
             <label>Cantidad *</label>
@@ -263,7 +273,7 @@ const RecepcionView = {
           <div class="field" style="grid-column: span 2;">
             <label>Serie</label>
             <div style="display:flex; gap:6px;">
-              <input type="text" id="r-serie" placeholder="Opcional" style="flex:1;" />
+              <input type="text" id="r-serie" placeholder="" style="flex:1;" />
               <button class="btn-text" id="btn-scan-manual">📷</button>
             </div>
           </div>
@@ -279,11 +289,11 @@ const RecepcionView = {
           </div>
           <div class="field">
             <label>N° Pedido</label>
-            <input type="text" id="r-pedido" placeholder="Ej: 13527842" />
+            <input type="text" id="r-pedido" placeholder="" />
           </div>
           <div class="field">
             <label>GR de ingreso</label>
-            <input type="text" id="r-gr" placeholder="Opcional" />
+            <input type="text" id="r-gr" placeholder="" />
           </div>
           <div class="field">
             <label>Fecha</label>

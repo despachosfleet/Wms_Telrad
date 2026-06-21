@@ -11,7 +11,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // FUNCIONES DE ACCESO A DATOS - STOCK
 // ============================================================
 
-async function buscarStockAvanzado({ sku = '', serie = '', ubic = '', paleta = '', cliente = '', estado = '', orden = 'id', dir = 'asc', limit = 200 } = {}) {
+async function buscarStockAvanzado({ sku = '', serie = '', ubic = '', paleta = '', cliente = '', estado = '', descripcion = '', orden = 'id', dir = 'asc', limit = 200 } = {}) {
   let query = sb.from('stock').select('*');
 
   if (sku) query = query.ilike('sku', `%${sku.trim()}%`);
@@ -20,6 +20,7 @@ async function buscarStockAvanzado({ sku = '', serie = '', ubic = '', paleta = '
   if (paleta) query = query.ilike('paleta_pedido', `%${paleta.trim()}%`);
   if (cliente) query = query.eq('cliente', cliente);
   if (estado) query = query.eq('estado', estado);
+  if (descripcion) query = query.ilike('descripcion', `%${descripcion.trim()}%`);
 
   query = query.order(orden, { ascending: dir === 'asc' }).limit(limit);
 
@@ -123,7 +124,7 @@ async function buscarStockPorSKU(sku, soloDisponible = true) {
 // FUNCIONES DE ACCESO A DATOS - DESPACHOS
 // ============================================================
 
-async function crearDespacho({ gr, fecha, cliente, destino, contrata, consignatarios, observaciones, items }) {
+async function crearDespacho({ gr, fecha, cliente, destino, razonSocial, contrata, consignatarios, observaciones, items }) {
   // Nota: aqui NO se busca ni reserva stock todavia (stock_id viene
   // null). El cruce contra stock (mudanza/ingreso nuevo) y la reserva
   // ocurren en la pantalla de Picking, al abrir cada item -asi se evita
@@ -137,6 +138,7 @@ async function crearDespacho({ gr, fecha, cliente, destino, contrata, consignata
       fecha: fecha || null,
       cliente: cliente || null,
       destino: destino || null,
+      razon_social: razonSocial || null,
       contrata: contrata || null,
       consignatarios: consignatarios || null,
       observaciones: observaciones || null,
@@ -249,8 +251,33 @@ async function obtenerDespachoConItems(despachoId) {
 // stock.paleta_pedido -> es ingreso nuevo); si no hay coincidencia por
 // pedido, busca por SKU en stock disponible (mudanza). Si no encuentra
 // nada, devuelve lista vacia para que la vista muestre la alerta.
-async function buscarStockParaItem(sku, identificadorPedido) {
-  // 1. Buscar primero por numero de pedido (ingreso nuevo)
+// Busca stock para un item de picking. Si el item requiere serie,
+// esa serie EXACTA manda sobre todo lo demas: no se sugiere otra
+// paleta/pedido con el mismo SKU pero serie distinta. Si la serie
+// no se encuentra, se marca POR_REVISAR (no se inventa una opcion).
+async function buscarStockParaItem(sku, identificadorPedido, serie) {
+  // 1. Si el item requiere serie, esa serie exacta manda sobre todo
+  if (serie) {
+    const { data: porSerie } = await sb
+      .from('stock')
+      .select('*')
+      .eq('sku', sku)
+      .eq('serie', serie)
+      .in('estado', ['DISPONIBLE', 'RESERVADO']);
+
+    if (porSerie && porSerie.length > 0) {
+      const origenSerie = identificadorPedido && porSerie[0].paleta_pedido === identificadorPedido
+        ? 'INGRESO_NUEVO' : 'MUDANZA';
+      return { data: porSerie, origen: origenSerie };
+    }
+
+    // No se encontro esa serie exacta: no se sugiere ninguna otra
+    // opcion con el mismo SKU, se marca para revision manual.
+    return { data: [], origen: 'POR_REVISAR' };
+  }
+
+  // 2. Item sin serie (lotizado): buscar primero por numero de
+  // pedido (ingreso nuevo)
   if (identificadorPedido) {
     const { data: porPedido } = await sb
       .from('stock')
@@ -265,7 +292,7 @@ async function buscarStockParaItem(sku, identificadorPedido) {
     }
   }
 
-  // 2. Buscar por SKU general (mudanza u otro stock disponible)
+  // 3. Buscar por SKU general (mudanza u otro stock disponible)
   const { data: porSku } = await sb
     .from('stock')
     .select('*')
@@ -705,4 +732,132 @@ async function confirmarRecepcion(recepcionId, pedido, cliente, itemsRecibidos) 
   }
 
   return { error: null };
+}
+
+// ============================================================
+// MAESTRO DE ARTICULOS (catalogo oficial Entel/Claro)
+// ============================================================
+
+async function buscarEnMaestro(sku) {
+  if (!sku) return null;
+  const { data, error } = await sb
+    .from('maestro_articulos')
+    .select('*')
+    .eq('sku', sku.trim())
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error buscarEnMaestro:', error);
+    return null;
+  }
+  return data;
+}
+
+// Valida una lista de items contra el maestro: marca cuales SKU
+// no existen en el catalogo oficial (posible error de extraccion),
+// y completa descripcion si esta vacia y el maestro la tiene.
+async function validarItemsContraMaestro(items) {
+  const skus = [...new Set(items.map(it => it.sku).filter(Boolean))];
+  if (skus.length === 0) return items;
+
+  const { data: encontrados, error } = await sb
+    .from('maestro_articulos')
+    .select('sku, descripcion, cliente')
+    .in('sku', skus);
+
+  if (error || !encontrados) return items.map(it => ({ ...it, enMaestro: null }));
+
+  const mapa = new Map(encontrados.map(e => [e.sku, e]));
+
+  return items.map(it => {
+    const match = mapa.get(it.sku);
+    return {
+      ...it,
+      enMaestro: !!match,
+      descripcion: it.descripcion || (match ? match.descripcion : it.descripcion)
+    };
+  });
+}
+
+// Busca paletas/pedidos distintos que coincidan con el texto, para
+// usar en sugerencias de busqueda (movimientos de paleta completa).
+async function buscarPaletasOPedidos(texto) {
+  if (!texto || texto.length < 2) return [];
+
+  const { data, error } = await sb
+    .from('stock')
+    .select('paleta_pedido, ubicacion_fisica, sku')
+    .ilike('paleta_pedido', `%${texto.trim()}%`)
+    .not('paleta_pedido', 'is', null)
+    .limit(100);
+
+  if (error || !data) return [];
+
+  const agrupado = new Map();
+  data.forEach(row => {
+    if (!agrupado.has(row.paleta_pedido)) {
+      agrupado.set(row.paleta_pedido, { paleta_pedido: row.paleta_pedido, ubicacion_fisica: row.ubicacion_fisica, cantidadItems: 0 });
+    }
+    agrupado.get(row.paleta_pedido).cantidadItems++;
+  });
+
+  return Array.from(agrupado.values()).slice(0, 10);
+}
+
+// Busca ubicaciones reales del catalogo que coincidan con el texto.
+async function buscarUbicacionesReales(texto) {
+  if (!texto || texto.length < 1) return [];
+
+  const { data, error } = await sb
+    .from('ubicaciones')
+    .select('codigo, zona, pasillo, posicion')
+    .ilike('codigo', `%${texto.trim()}%`)
+    .limit(10);
+
+  if (error || !data) return [];
+  return data;
+}
+
+// ============================================================
+// GESTION DE UBICACIONES (modulo de administracion)
+// ============================================================
+
+async function obtenerTodasLasUbicaciones() {
+  const { data, error } = await sb
+    .from('ubicaciones')
+    .select('*, paletas_ubicacion(paleta)')
+    .order('zona', { ascending: true })
+    .order('posicion', { ascending: true })
+    .order('sub_posicion', { ascending: true });
+
+  if (error) {
+    console.error('Error obtenerTodasLasUbicaciones:', error);
+    return [];
+  }
+  return data || [];
+}
+
+async function crearUbicacion({ zona, pasillo, posicion, subPosicion, tipo }) {
+  const codigo = subPosicion
+    ? `${zona}-${pasillo}-${posicion}-${subPosicion}`
+    : `${zona}-${pasillo}-${posicion}`;
+
+  const { data, error } = await sb
+    .from('ubicaciones')
+    .insert([{ codigo, zona, pasillo, posicion, sub_posicion: subPosicion || null, tipo: tipo || 'PALETA' }])
+    .select()
+    .single();
+
+  return { data, error };
+}
+
+async function eliminarUbicacion(id) {
+  // No permite borrar si tiene paletas asignadas
+  const { data: paletas } = await sb.from('paletas_ubicacion').select('id').eq('ubicacion_id', id);
+  if (paletas && paletas.length > 0) {
+    return { error: new Error('Esta ubicación tiene paletas asignadas. Muévelas primero.') };
+  }
+  const { error } = await sb.from('ubicaciones').delete().eq('id', id);
+  return { error };
 }

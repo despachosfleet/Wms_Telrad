@@ -15,7 +15,7 @@ const RegistroDespachosView = {
         <div class="field-grid">
           <div class="field" style="grid-column: span 2;">
             <label>Buscar (GR, SKU, serie, cliente, destino)</label>
-            <input type="text" id="f-buscar-registro" placeholder="Escribe para filtrar" />
+            <input type="text" id="f-buscar-registro" placeholder="" />
           </div>
           <div class="field">
             <label>Desde</label>

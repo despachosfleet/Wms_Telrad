@@ -1,110 +1,83 @@
 // ============================================================
 // VISTA: NUEVA ORDEN DE PICKING
-// 2 modos: Manual (PDF directo, fuente principal y rapida) o
-// Subir archivo (Excel masivo -> lista de guias pendientes,
-// para cuando llega la programacion de cadena de suministro).
+// 3 modos separados y expandibles: PDF (rapido, fuente principal),
+// Excel (masivo, formato generico estandar -> lista de pendientes),
+// Manual (escribir todo a mano).
 // La validacion de stock (mudanza/ingreso nuevo/ubicacion) NO
-// ocurre aqui -ocurre despues, en la pantalla de Picking-, para
-// no duplicar el trabajo de revision que ya se hace al pickear.
+// ocurre aqui -ocurre en Picking-, para no duplicar revision.
 // ============================================================
 
 const NuevoPickingView = {
   title: 'Nueva orden de picking',
-  _modo: null,
+  _modoAbierto: null,
   _filas: [],
   _guiaActivaId: null,
 
   render() {
     return `
-      <div class="card" id="selector-modo">
+      <div class="card">
         <p class="card-title">¿Cómo quieres registrar el picking?</p>
-        <div style="display:flex; gap:10px; flex-wrap:wrap;">
-          <button class="btn-primary" id="btn-modo-manual" style="flex:1; min-width:140px;">Manual (PDF)</button>
-          <button class="btn-primary" id="btn-modo-archivo" style="flex:1; min-width:140px; background:var(--neutral-bg); color:var(--text-primary);">Subir Excel</button>
+        <div class="expandable-group">
+          <button class="expandable-header" data-toggle="pdf">
+            <span>Importar PDF de la guía</span>
+            <svg class="chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="expandable-body" id="body-pdf" style="display:none;"></div>
+
+          <button class="expandable-header" data-toggle="excel">
+            <span>Subir Excel masivo</span>
+            <svg class="chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="expandable-body" id="body-excel" style="display:none;"></div>
+
+          <button class="expandable-header" data-toggle="manual">
+            <span>Registro manual</span>
+            <svg class="chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="expandable-body" id="body-manual" style="display:none;"></div>
         </div>
       </div>
-      <div id="contenido-modo"></div>
+      <div id="formulario-orden-cont"></div>
     `;
   },
 
   afterRender() {
-    this._modo = null;
-    document.getElementById('btn-modo-manual').addEventListener('click', () => this.activarModoManual());
-    document.getElementById('btn-modo-archivo').addEventListener('click', () => this.activarModoArchivo());
+    this._modoAbierto = null;
+    document.querySelectorAll('[data-toggle]').forEach(btn => {
+      btn.addEventListener('click', () => this.toggleModo(btn.dataset.toggle));
+    });
+  },
+
+  toggleModo(modo) {
+    const yaAbierto = this._modoAbierto === modo;
+    document.querySelectorAll('.expandable-body').forEach(b => b.style.display = 'none');
+    document.querySelectorAll('.expandable-header').forEach(h => h.classList.remove('expanded'));
+
+    if (yaAbierto) {
+      this._modoAbierto = null;
+      document.getElementById('formulario-orden-cont').innerHTML = '';
+      return;
+    }
+
+    this._modoAbierto = modo;
+    document.querySelector(`[data-toggle="${modo}"]`).classList.add('expanded');
+    const body = document.getElementById(`body-${modo}`);
+    body.style.display = 'block';
+
+    if (modo === 'pdf') this.renderModoPDF(body);
+    if (modo === 'excel') this.renderModoExcel(body);
+    if (modo === 'manual') this.renderModoManual();
   },
 
   // ============================================================
-  // MODO MANUAL: el PDF es la fuente principal y rapida
+  // MODO PDF
   // ============================================================
-  activarModoManual() {
-    this._modo = 'manual';
-    this._filas = [{ sku: '', cantidad: '', serie: '', identificadorPedido: '' }];
-
-    const cont = document.getElementById('contenido-modo');
-    cont.innerHTML = `
-      <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <p class="card-title" style="margin:0;">Importar guía (PDF)</p>
-          <button class="btn-primary" id="btn-import-pdf" style="width:auto; padding:8px 18px;">Subir PDF</button>
-        </div>
-        <input type="file" id="input-pdf" accept="application/pdf" style="display:none;" />
-        <div id="pdf-status"></div>
-        <p style="font-size:11px; color:var(--text-secondary); margin:8px 0 0;">Extrae automáticamente GR, destino, razón social e ítems. Revisa y corrige antes de generar.</p>
-      </div>
-
-      <div class="card">
-        <p class="card-title">Datos de la guía</p>
-        <div class="field-grid">
-          <div class="field"><label>N° GR</label><input type="text" id="f-gr" placeholder="T022-0000000132" /></div>
-          <div class="field"><label>Fecha</label><input type="date" id="f-fecha" /></div>
-          <div class="field">
-            <label>Cliente</label>
-            <select id="f-cliente">
-              <option value="">Seleccionar</option>
-              <option value="ENTEL">ENTEL</option>
-              <option value="CLARO">CLARO</option>
-              <option value="TELRAD">TELRAD</option>
-              <option value="AMERICATEL">AMERICATEL</option>
-            </select>
-          </div>
-          <div class="field"><label>Destino</label><input type="text" id="f-destino" placeholder="Moyobamba" /></div>
-          <div class="field" style="grid-column: span 2;"><label>Razón social / Destinatario</label><input type="text" id="f-razon-social" placeholder="Opcional" /></div>
-          <div class="field"><label>Contrata</label><input type="text" id="f-contrata" placeholder="Opcional" /></div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
-          <p class="card-title" style="margin:0;">Ítems de la guía</p>
-          <button class="btn-text" id="btn-add-row">
-            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Agregar fila
-          </button>
-        </div>
-        <div style="overflow-x:auto;">
-          <table class="item-table">
-            <thead>
-              <tr><th class="col-sku">SKU</th><th>Cant.</th><th>Serie / Pedido</th><th class="col-del"></th></tr>
-            </thead>
-            <tbody id="filas-body"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="hint-box">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-        <p>La validación contra stock (mudanza o ingreso nuevo, ubicación) se hace al pickear, no aquí — para no revisar dos veces.</p>
-      </div>
-
-      <button class="btn-primary" id="btn-crear">Generar orden de picking</button>
+  renderModoPDF(body) {
+    body.innerHTML = `
+      <button class="btn-primary" id="btn-import-pdf" style="width:auto; padding:9px 18px;">Subir PDF</button>
+      <input type="file" id="input-pdf" accept="application/pdf" style="display:none;" />
+      <div id="pdf-status"></div>
     `;
-
-    document.getElementById('f-fecha').value = new Date().toISOString().slice(0, 10);
-
-    document.getElementById('btn-add-row').addEventListener('click', () => {
-      this._filas.push({ sku: '', cantidad: '', serie: '', identificadorPedido: '' });
-      this.renderFilas();
-    });
 
     document.getElementById('btn-import-pdf').addEventListener('click', () => document.getElementById('input-pdf').click());
     document.getElementById('input-pdf').addEventListener('change', async (e) => {
@@ -113,56 +86,65 @@ const NuevoPickingView = {
       await this.importarPDF(file);
       e.target.value = '';
     });
-
-    document.getElementById('btn-crear').addEventListener('click', () => this.crearOrdenPicking());
-
-    this.renderFilas();
   },
 
   async importarPDF(file) {
     const statusEl = document.getElementById('pdf-status');
-    statusEl.innerHTML = `<p style="font-size:11px; color:var(--text-tertiary); margin:6px 0 0;">Leyendo guía...</p>`;
+    statusEl.innerHTML = `<p class="status-msg status-loading">Leyendo guía...</p>`;
 
     const { data, error } = await procesarGuiaPDF(file);
 
     if (error || !data) {
-      statusEl.innerHTML = `<p style="font-size:11px; color:var(--danger); margin:6px 0 0;">No se pudo leer el PDF: ${escapeHtml(error || 'error desconocido')}</p>`;
+      statusEl.innerHTML = `<p class="status-msg status-error">No se pudo leer el PDF: ${escapeHtml(error || 'error desconocido')}</p>`;
       return;
     }
     if (data.errores.length > 0) {
-      statusEl.innerHTML = `<p style="font-size:11px; color:var(--warning); margin:6px 0 0;">${escapeHtml(data.errores.join(' '))}</p>`;
+      statusEl.innerHTML = `<p class="status-msg status-warning">${escapeHtml(data.errores.join(' '))}</p>`;
       return;
     }
 
-    if (data.guia) document.getElementById('f-gr').value = data.guia;
-    if (data.destino) document.getElementById('f-destino').value = data.destino;
-    if (data.razonSocial) document.getElementById('f-razon-social').value = data.razonSocial;
+    statusEl.innerHTML = `<p class="status-msg status-loading">Validando ítems contra el catálogo...</p>`;
 
-    this._filas = data.items.map(it => ({
-      sku: it.codigo || '',
-      cantidad: String(it.cantidad),
-      serie: it.serie || '',
-      identificadorPedido: it.identificadorPedido || ''
+    const itemsCrudos = data.items.map(it => ({
+      sku: it.codigo || '', descripcion: it.descripcion || '',
+      cantidad: String(it.cantidad), serie: it.serie || '', identificadorPedido: it.identificadorPedido || ''
     }));
 
-    statusEl.innerHTML = `<p style="font-size:11px; color:var(--success); margin:6px 0 0;">${data.items.length} ítems importados. Revisa antes de generar.</p>`;
-    this.renderFilas();
+    const validados = await validarItemsContraMaestro(itemsCrudos);
+    this._filas = validados;
+
+    this.activarFormulario({
+      gr: data.guia, destino: data.destino, razonSocial: data.razonSocial
+    });
+
+    const sinMaestro = validados.filter(f => f.enMaestro === false).length;
+    let msg = `${data.items.length} ítems importados.`;
+    if (sinMaestro > 0) msg += ` ${sinMaestro} SKU no encontrados en el catálogo — revisa antes de generar.`;
+    statusEl.innerHTML = `<p class="status-msg status-success">${escapeHtml(msg)}</p>`;
   },
 
   // ============================================================
-  // MODO ARCHIVO (Excel masivo -> lista de guias pendientes)
+  // MODO EXCEL (formato generico estandar, no especial)
   // ============================================================
-  activarModoArchivo() {
-    this._modo = 'archivo';
-    const cont = document.getElementById('contenido-modo');
-    cont.innerHTML = `
-      <div class="card">
-        <p class="card-title">Subir Excel de programación</p>
-        <p style="font-size:11px; color:var(--text-secondary); margin:0 0 10px;">Sube el Excel completo (con varias guías). El sistema detectará cada guía y la agregará a la lista de pendientes para que las resuelvas una por una con su PDF.</p>
-        <button class="btn-primary" id="btn-subir-excel-masivo">Seleccionar archivo Excel</button>
-        <input type="file" id="input-excel-masivo" accept=".xlsx,.xls" style="display:none;" />
-        <div id="masivo-status" style="margin-top:8px;"></div>
+  renderModoExcel(body) {
+    body.innerHTML = `
+      <div class="format-guide">
+        <p class="format-guide-title">El Excel debe tener estas columnas (en la primera fila):</p>
+        <table class="format-guide-table">
+          <tr><td><strong>GR</strong></td><td>Número de guía</td></tr>
+          <tr><td><strong>SKU</strong></td><td>Código del producto</td></tr>
+          <tr><td><strong>DESCRIPCION</strong></td><td>Descripción del producto</td></tr>
+          <tr><td><strong>CANTIDAD</strong></td><td>Cantidad a pickear</td></tr>
+          <tr><td><strong>SERIE</strong></td><td>Si aplica (opcional)</td></tr>
+          <tr><td><strong>PEDIDO</strong></td><td>Si aplica (opcional)</td></tr>
+          <tr><td><strong>CLIENTE</strong></td><td>Opcional</td></tr>
+          <tr><td><strong>DESTINO</strong></td><td>Opcional</td></tr>
+        </table>
+        <p class="format-guide-note">El resto de columnas que traiga el archivo se ignoran. Si el Excel trae varias guías mezcladas, se separan automáticamente por GR.</p>
       </div>
+      <button class="btn-primary" id="btn-subir-excel-masivo" style="width:auto; padding:9px 18px;">Seleccionar archivo Excel</button>
+      <input type="file" id="input-excel-masivo" accept=".xlsx,.xls" style="display:none;" />
+      <div id="masivo-status"></div>
       <div id="lista-pendientes-cont"></div>
     `;
 
@@ -179,19 +161,19 @@ const NuevoPickingView = {
 
   async subirExcelMasivo(file) {
     const statusEl = document.getElementById('masivo-status');
-    statusEl.innerHTML = `<p style="font-size:11px; color:var(--text-tertiary); margin:0;">Leyendo Excel...</p>`;
+    statusEl.innerHTML = `<p class="status-msg status-loading">Leyendo Excel...</p>`;
 
-    const { data: guias, error } = await agruparTodasLasGuiasDeExcel(file);
+    const { data: guias, error } = await agruparGuiasGenerico(file);
 
     if (error || !guias) {
-      statusEl.innerHTML = `<p style="font-size:11px; color:var(--danger); margin:0;">${escapeHtml(error || 'Error al leer el archivo.')}</p>`;
+      statusEl.innerHTML = `<p class="status-msg status-error">${escapeHtml(error || 'Error al leer el archivo.')}</p>`;
       return;
     }
 
     const { data: guardadas, error: errGuardar } = await guardarGuiasPendientes(guias);
 
     if (errGuardar) {
-      statusEl.innerHTML = `<p style="font-size:11px; color:var(--danger); margin:0;">Se detectaron ${guias.length} guías, pero hubo un error al guardarlas. Revisa tu conexión.</p>`;
+      statusEl.innerHTML = `<p class="status-msg status-error">Se detectaron ${guias.length} guías, pero hubo un error al guardarlas. Revisa tu conexión.</p>`;
       return;
     }
 
@@ -200,18 +182,19 @@ const NuevoPickingView = {
     let msg = `${nuevasGuardadas} guía(s) nueva(s) agregada(s) a pendientes.`;
     if (yaExistian > 0) msg += ` ${yaExistian} ya estaban en la lista (omitida(s)).`;
 
-    statusEl.innerHTML = `<p style="font-size:11px; color:var(--success); margin:0;">${escapeHtml(msg)}</p>`;
+    statusEl.innerHTML = `<p class="status-msg status-success">${escapeHtml(msg)}</p>`;
     await this.cargarYRenderizarPendientes();
   },
 
   async cargarYRenderizarPendientes() {
     const cont = document.getElementById('lista-pendientes-cont');
-    cont.innerHTML = `<p style="font-size:11px; color:var(--text-tertiary); margin:14px 0 0;">Cargando pendientes...</p>`;
+    if (!cont) return;
+    cont.innerHTML = `<p class="status-msg status-loading">Cargando pendientes...</p>`;
 
     const pendientes = await obtenerGuiasPendientes({ estado: 'PENDIENTE' });
 
     if (pendientes.length === 0) {
-      cont.innerHTML = `<p style="font-size:11px; color:var(--text-tertiary); margin:14px 0 0;">No hay guías pendientes por ahora.</p>`;
+      cont.innerHTML = `<p class="status-msg status-loading">No hay guías pendientes por ahora.</p>`;
       return;
     }
 
@@ -240,35 +223,118 @@ const NuevoPickingView = {
 
   resolverPendiente(pendiente) {
     this._guiaActivaId = pendiente.id;
-    this.activarModoManual();
-
-    document.getElementById('f-gr').value = pendiente.gr;
-    if (pendiente.cliente) document.getElementById('f-cliente').value = pendiente.cliente;
-    if (pendiente.destino) document.getElementById('f-destino').value = pendiente.destino;
-    if (pendiente.razon_social) document.getElementById('f-razon-social').value = pendiente.razon_social;
+    this._modoAbierto = 'manual';
+    document.querySelectorAll('.expandable-body').forEach(b => b.style.display = 'none');
+    document.querySelectorAll('.expandable-header').forEach(h => h.classList.remove('expanded'));
+    document.querySelector('[data-toggle="manual"]').classList.add('expanded');
+    document.getElementById('body-manual').style.display = 'block';
 
     this._filas = (pendiente.items || []).map(it => ({
-      sku: it.sku || '', cantidad: it.cantidad != null ? String(it.cantidad) : '',
+      sku: it.sku || '', descripcion: it.descripcion || '',
+      cantidad: it.cantidad != null ? String(it.cantidad) : '',
       serie: it.serie || '', identificadorPedido: it.pedido_pallet || ''
     }));
     if (this._filas.length === 0) {
-      this._filas = [{ sku: '', cantidad: '', serie: '', identificadorPedido: '' }];
+      this._filas = [{ sku: '', descripcion: '', cantidad: '', serie: '', identificadorPedido: '' }];
     }
-    this.renderFilas();
+
+    this.activarFormulario({
+      gr: pendiente.gr, destino: pendiente.destino, razonSocial: pendiente.razon_social, cliente: pendiente.cliente
+    });
   },
 
   // ============================================================
-  // COMPARTIDO: tabla de filas y crear orden
+  // MODO MANUAL
   // ============================================================
+  renderModoManual() {
+    if (this._filas.length === 0) {
+      this._filas = [{ sku: '', descripcion: '', cantidad: '', serie: '', identificadorPedido: '' }];
+    }
+    this.activarFormulario({});
+  },
+
+  // ============================================================
+  // FORMULARIO COMPARTIDO (cabecera + tabla de items)
+  // ============================================================
+  activarFormulario(datosIniciales) {
+    const cont = document.getElementById('formulario-orden-cont');
+    cont.innerHTML = `
+      <div class="card">
+        <p class="card-title">Datos de la guía</p>
+        <div class="field-grid">
+          <div class="field"><label>N° GR</label><input type="text" id="f-gr" /></div>
+          <div class="field"><label>Fecha</label><input type="date" id="f-fecha" /></div>
+          <div class="field">
+            <label>Cliente</label>
+            <select id="f-cliente">
+              <option value="">Seleccionar</option>
+              <option value="ENTEL">ENTEL</option>
+              <option value="CLARO">CLARO</option>
+              <option value="TELRAD">TELRAD</option>
+              <option value="AMERICATEL">AMERICATEL</option>
+            </select>
+          </div>
+          <div class="field"><label>Destino</label><input type="text" id="f-destino" /></div>
+          <div class="field" style="grid-column: span 2;"><label>Razón social / Destinatario</label><input type="text" id="f-razon-social" /></div>
+          <div class="field"><label>Contrata</label><input type="text" id="f-contrata" /></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <p class="card-title" style="margin:0;">Ítems de la guía</p>
+          <button class="btn-text" id="btn-add-row">
+            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Agregar fila
+          </button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="item-table">
+            <thead>
+              <tr><th class="col-sku">SKU</th><th>Descripción</th><th>Cant.</th><th>Serie</th><th>Pedido</th><th class="col-del"></th></tr>
+            </thead>
+            <tbody id="filas-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="hint-box">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <p>La validación contra stock (mudanza o ingreso nuevo, ubicación) se hace al pickear, no aquí.</p>
+      </div>
+
+      <button class="btn-primary" id="btn-crear">Generar orden de picking</button>
+    `;
+
+    document.getElementById('f-fecha').value = new Date().toISOString().slice(0, 10);
+    if (datosIniciales.gr) document.getElementById('f-gr').value = datosIniciales.gr;
+    if (datosIniciales.destino) document.getElementById('f-destino').value = datosIniciales.destino;
+    if (datosIniciales.razonSocial) document.getElementById('f-razon-social').value = datosIniciales.razonSocial;
+    if (datosIniciales.cliente) document.getElementById('f-cliente').value = datosIniciales.cliente;
+
+    document.getElementById('btn-add-row').addEventListener('click', () => {
+      this._filas.push({ sku: '', descripcion: '', cantidad: '', serie: '', identificadorPedido: '' });
+      this.renderFilas();
+    });
+    document.getElementById('btn-crear').addEventListener('click', () => this.crearOrdenPicking());
+
+    this.renderFilas();
+  },
+
   renderFilas() {
     const tbody = document.getElementById('filas-body');
     if (!tbody) return;
 
     tbody.innerHTML = this._filas.map((f, i) => `
       <tr>
-        <td class="col-sku"><input type="text" value="${escapeHtml(f.sku)}" data-i="${i}" data-f="sku" placeholder="SKU" /></td>
-        <td><input type="number" value="${escapeHtml(f.cantidad)}" data-i="${i}" data-f="cantidad" placeholder="0" min="0" step="any" /></td>
-        <td><input type="text" value="${escapeHtml(f.serie || f.identificadorPedido || '')}" data-i="${i}" data-f="serie" placeholder="Serie o pedido" /></td>
+        <td class="col-sku">
+          <input type="text" value="${escapeHtml(f.sku)}" data-i="${i}" data-f="sku" />
+          ${f.enMaestro === false ? '<div class="sku-warning">No está en el catálogo</div>' : ''}
+        </td>
+        <td><input type="text" value="${escapeHtml(f.descripcion || '')}" data-i="${i}" data-f="descripcion" /></td>
+        <td><input type="number" value="${escapeHtml(f.cantidad)}" data-i="${i}" data-f="cantidad" min="0" step="any" /></td>
+        <td><input type="text" value="${escapeHtml(f.serie || '')}" data-i="${i}" data-f="serie" /></td>
+        <td><input type="text" value="${escapeHtml(f.identificadorPedido || '')}" data-i="${i}" data-f="identificadorPedido" /></td>
         <td class="col-del"><span class="del-icon" data-del="${i}"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></span></td>
       </tr>
     `).join('');
@@ -288,7 +354,7 @@ const NuevoPickingView = {
       el.addEventListener('click', () => {
         const i = Number(el.dataset.del);
         this._filas.splice(i, 1);
-        if (this._filas.length === 0) this._filas = [{ sku: '', cantidad: '', serie: '', identificadorPedido: '' }];
+        if (this._filas.length === 0) this._filas = [{ sku: '', descripcion: '', cantidad: '', serie: '', identificadorPedido: '' }];
         this.renderFilas();
       });
     });
@@ -312,13 +378,10 @@ const NuevoPickingView = {
     btn.disabled = true;
     btn.textContent = 'Generando...';
 
-    // Aqui NO se busca stock todavia (eso se hace en Picking). Solo
-    // se guarda el identificador de pedido como referencia para esa
-    // busqueda posterior.
     const items = itemsValidos.map(f => ({
       stock_id: null,
       sku: f.sku.trim(),
-      descripcion: null,
+      descripcion: f.descripcion ? f.descripcion.trim() : null,
       serie: f.serie ? f.serie.trim() : null,
       cantidad: Number(f.cantidad),
       paleta_pedido: f.identificadorPedido ? f.identificadorPedido.trim() : null,
@@ -327,9 +390,9 @@ const NuevoPickingView = {
     }));
 
     const { data, error } = await crearDespacho({
-      gr, fecha, cliente, destino,
+      gr, fecha, cliente, destino, razonSocial,
       contrata, consignatarios: null,
-      observaciones: razonSocial ? `Destinatario: ${razonSocial}` : null,
+      observaciones: null,
       items
     });
 

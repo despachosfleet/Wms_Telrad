@@ -260,3 +260,91 @@ function validarContraPDF(itemsExcel, itemsPDF) {
 
   return resultado;
 }
+
+// ============================================================
+// FORMATO GENERICO DE EXCEL (para Nueva orden de picking)
+// Columnas: GR, SKU, DESCRIPCION, CANTIDAD, SERIE (opcional),
+// PEDIDO (opcional), CLIENTE (opcional), DESTINO (opcional).
+// Distinto del formato de cadena de suministro (que tiene mas
+// columnas especificas tipo PROVINCIA DE ENVIO, CONSIGANDO, etc).
+// ============================================================
+
+const COLUMNAS_GENERICO = {
+  'GR': 'gr', 'NUMERO DE GUIA': 'gr', 'N GUIA': 'gr', 'GUIA': 'gr',
+  'SKU': 'sku', 'CODIGO': 'sku', 'CÓDIGO': 'sku',
+  'DESCRIPCION': 'descripcion', 'DESCRIPCIÓN': 'descripcion',
+  'CANTIDAD': 'cantidad',
+  'SERIE': 'serie',
+  'PEDIDO': 'pedido', 'N PEDIDO': 'pedido', 'NRO PEDIDO': 'pedido',
+  'CLIENTE': 'cliente',
+  'DESTINO': 'destino'
+};
+
+function detectarEncabezadosGenerico(filas) {
+  for (let f = 0; f < Math.min(filas.length, 5); f++) {
+    const fila = filas[f];
+    if (!fila) continue;
+    const tieneGR = fila.some(c => COLUMNAS_GENERICO[normalizar(c)] === 'gr');
+    const tieneSKU = fila.some(c => COLUMNAS_GENERICO[normalizar(c)] === 'sku');
+    if (tieneGR && tieneSKU) {
+      const colMap = {};
+      fila.forEach((celda, i) => {
+        const campo = COLUMNAS_GENERICO[normalizar(celda)];
+        if (campo) colMap[campo] = i;
+      });
+      return { filaEncabezado: f, colMap };
+    }
+  }
+  return null;
+}
+
+async function agruparGuiasGenerico(file) {
+  await cargarXlsx();
+
+  const arrayBuffer = await file.arrayBuffer();
+  const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+
+  for (const sheetName of workbook.SheetNames) {
+    const sheet = workbook.Sheets[sheetName];
+    const filas = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
+
+    const encabezado = detectarEncabezadosGenerico(filas);
+    if (!encabezado) continue;
+
+    const { filaEncabezado, colMap } = encabezado;
+    if (colMap.gr === undefined || colMap.sku === undefined) continue;
+
+    const guias = {};
+
+    for (let f = filaEncabezado + 1; f < filas.length; f++) {
+      const fila = filas[f];
+      if (!fila) continue;
+      const gr = fila[colMap.gr];
+      if (!gr) continue;
+
+      const grStr = String(gr).trim();
+      if (!guias[grStr]) guias[grStr] = { gr: grStr, cabecera: null, items: [] };
+
+      guias[grStr].items.push({
+        sku: colMap.sku !== undefined && fila[colMap.sku] ? String(fila[colMap.sku]).trim() : null,
+        descripcion: colMap.descripcion !== undefined && fila[colMap.descripcion] ? String(fila[colMap.descripcion]).trim() : null,
+        cantidad: colMap.cantidad !== undefined && fila[colMap.cantidad] ? Number(fila[colMap.cantidad]) : null,
+        serie: colMap.serie !== undefined && fila[colMap.serie] ? String(fila[colMap.serie]).trim() : null,
+        pedido_pallet: colMap.pedido !== undefined && fila[colMap.pedido] ? String(fila[colMap.pedido]).trim() : null
+      });
+
+      if (!guias[grStr].cabecera) {
+        guias[grStr].cabecera = {
+          cliente: colMap.cliente !== undefined && fila[colMap.cliente] ? String(fila[colMap.cliente]).trim() : null,
+          destino: colMap.destino !== undefined && fila[colMap.destino] ? String(fila[colMap.destino]).trim() : null,
+          razon_social: null, agencia: null, consignatario_1: null, consignatario_2: null
+        };
+      }
+    }
+
+    const lista = Object.values(guias);
+    if (lista.length > 0) return { data: lista, error: null };
+  }
+
+  return { data: null, error: 'No se detectaron guías. Verifica que el Excel tenga columnas "GR" y "SKU" en la primera fila.' };
+}
