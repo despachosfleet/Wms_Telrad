@@ -103,10 +103,7 @@ function abrirDropdownModulo(moduloId, btnRef) {
   const btnRect = btnRef.getBoundingClientRect();
  
   panel.innerHTML = modulo.submodulos.map(s => `
-    <button class="dropdown-option" data-nav-dd="${s.nav}">
-      <span class="dropdown-option-label">${escapeHtml(s.label)}</span>
-      <span class="dropdown-option-desc">${escapeHtml(s.desc)}</span>
-    </button>
+    <button class="dropdown-option" data-nav-dd="${s.nav}">${escapeHtml(s.label)}</button>
   `).join('');
  
   panel.style.left = (btnRect.left - navRect.left) + 'px';
@@ -116,6 +113,14 @@ function abrirDropdownModulo(moduloId, btnRef) {
   _moduloActivo = moduloId;
   document.querySelectorAll('.module-item').forEach(b => b.classList.remove('active'));
   btnRef.classList.add('active');
+ 
+  // Si estamos parados en la vista "menu", su contenido tambien debe
+  // actualizarse para reflejar el modulo recien seleccionado (antes
+  // solo se actualizaba la barra, dejando la tarjeta de abajo
+  // desactualizada con el modulo anterior).
+  if (Router.currentView === 'menu' && typeof MenuView !== 'undefined') {
+    document.getElementById('main-content').innerHTML = MenuView.render();
+  }
  
   panel.querySelectorAll('[data-nav-dd]').forEach(opt => {
     opt.addEventListener('click', (e) => {
@@ -148,27 +153,16 @@ const MenuView = {
   title: 'Almacén Fleet — WMS',
  
   render() {
-    const modulo = MODULOS.find(m => m.id === _moduloActivo) || MODULOS[0];
- 
     return `
-      <div class="menu-grid">
-        ${modulo.submodulos.map(s => `
-          <button class="menu-item" data-nav="${s.nav}">
-            <span>${escapeHtml(s.label)}</span>
-            <small>${escapeHtml(s.desc)}</small>
-          </button>
-        `).join('')}
+      <div class="welcome-screen">
+        <p class="welcome-text">Selecciona un módulo arriba para empezar.</p>
       </div>
     `;
   },
  
   afterRender() {
     renderBarraModulos();
-    document.querySelectorAll('[data-nav]').forEach(btn => {
-      btn.addEventListener('click', () => Router.navigate(btn.dataset.nav));
-    });
   }
 };
  
 Router.register('menu', MenuView);
- 
