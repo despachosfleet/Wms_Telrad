@@ -49,6 +49,48 @@ const NuevoPickingView = {
   },
 
   toggleModo(modo) {
+    const hayDatosSinGuardar = this._filas.some(f => f.sku && f.sku.trim());
+
+    if (hayDatosSinGuardar && this._modoAbierto && this._modoAbierto !== modo) {
+      this.confirmarCambioModo(modo);
+      return;
+    }
+
+    this.cambiarModoReal(modo);
+  },
+
+  confirmarCambioModo(modoNuevo) {
+    const modalCont = document.getElementById('modal-advertencia-cont') || (() => {
+      const div = document.createElement('div');
+      div.id = 'modal-advertencia-cont';
+      document.body.appendChild(div);
+      return div;
+    })();
+
+    modalCont.innerHTML = `
+      <div class="modal-overlay" id="modal-overlay-cambio">
+        <div class="modal-box">
+          <p class="modal-title">⚠️ Vas a perder lo avanzado</p>
+          <p class="modal-text">Ya tienes ítems cargados en este formulario. Si cambias de opción, se borrará todo lo que llevas hasta ahora.</p>
+          <div class="modal-actions">
+            <button class="btn-modal-secundario" id="btn-cancelar-cambio">Cancelar</button>
+            <button class="btn-modal-primario" id="btn-confirmar-cambio" style="background:var(--danger-text);">Sí, descartar y cambiar</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('modal-overlay-cambio').addEventListener('click', (e) => {
+      if (e.target.id === 'modal-overlay-cambio') modalCont.innerHTML = '';
+    });
+    document.getElementById('btn-cancelar-cambio').addEventListener('click', () => { modalCont.innerHTML = ''; });
+    document.getElementById('btn-confirmar-cambio').addEventListener('click', () => {
+      modalCont.innerHTML = '';
+      this.cambiarModoReal(modoNuevo);
+    });
+  },
+
+  cambiarModoReal(modo) {
     const yaAbierto = this._modoAbierto === modo;
     document.querySelectorAll('.expandable-body').forEach(b => b.style.display = 'none');
     document.querySelectorAll('.expandable-header').forEach(h => h.classList.remove('expanded'));

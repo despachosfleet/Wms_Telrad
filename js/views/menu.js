@@ -4,7 +4,7 @@
 // toda la app, no solo en esta vista. Esta vista solo muestra
 // las opciones (submodulos) del modulo activo.
 // ============================================================
- 
+
 const MODULOS = [
   {
     id: 'recepcion-mod',
@@ -59,28 +59,28 @@ const MODULOS = [
     ]
   }
 ];
- 
+
 // Mapa inverso: dado un nombre de vista, encuentra a que modulo pertenece
 const VISTA_A_MODULO = {};
 MODULOS.forEach(m => m.submodulos.forEach(s => { VISTA_A_MODULO[s.nav] = m.id; }));
 // Nota: 'menu' NO se mapea a un modulo fijo aqui, porque eso
 // sobrescribia la seleccion real del usuario cada vez que la
 // vista 'menu' se volvia a renderizar (bug confirmado).
- 
+
 let _moduloActivo = MODULOS[0].id;
- 
+
 let _dropdownAbierto = null;
- 
+
 function renderBarraModulos() {
   const nav = document.getElementById('module-nav');
   if (!nav) return;
- 
+
   nav.innerHTML = MODULOS.map(m => `
     <button class="module-item ${m.id === _moduloActivo ? 'active' : ''}" data-modulo="${m.id}">
       ${m.icono}<span>${m.label}</span>
     </button>
   `).join('');
- 
+
   nav.querySelectorAll('[data-modulo]').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -93,27 +93,27 @@ function renderBarraModulos() {
     });
   });
 }
- 
+
 function abrirDropdownModulo(moduloId, btnRef) {
   const modulo = MODULOS.find(m => m.id === moduloId);
   if (!modulo) return;
- 
+
   const panel = document.getElementById('module-dropdown-panel');
   const btnRect = btnRef.getBoundingClientRect();
- 
+
   panel.innerHTML = modulo.submodulos.map(s => `
     <button class="dropdown-option" data-nav-dd="${s.nav}">${escapeHtml(s.label)}</button>
   `).join('');
- 
+
   panel.style.left = btnRect.left + 'px';
   panel.style.top = btnRect.bottom + 'px';
   panel.style.display = 'block';
   _dropdownAbierto = moduloId;
- 
+
   _moduloActivo = moduloId;
   document.querySelectorAll('.module-item').forEach(b => b.classList.remove('active'));
   btnRef.classList.add('active');
- 
+
   // Si estamos parados en la vista "menu", su contenido tambien debe
   // actualizarse para reflejar el modulo recien seleccionado (antes
   // solo se actualizaba la barra, dejando la tarjeta de abajo
@@ -121,7 +121,7 @@ function abrirDropdownModulo(moduloId, btnRef) {
   if (Router.currentView === 'menu' && typeof MenuView !== 'undefined') {
     document.getElementById('main-content').innerHTML = MenuView.render();
   }
- 
+
   panel.querySelectorAll('[data-nav-dd]').forEach(opt => {
     opt.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -130,15 +130,15 @@ function abrirDropdownModulo(moduloId, btnRef) {
     });
   });
 }
- 
+
 function cerrarDropdownModulos() {
   const panel = document.getElementById('module-dropdown-panel');
   if (panel) panel.style.display = 'none';
   _dropdownAbierto = null;
 }
- 
+
 document.addEventListener('click', () => cerrarDropdownModulos());
- 
+
 // Llamar esto desde cualquier vista al navegar, para que la barra
 // resalte el modulo correcto aunque no se haya pasado por "menu"
 function sincronizarModuloActivo(vistaActual) {
@@ -148,10 +148,10 @@ function sincronizarModuloActivo(vistaActual) {
   cerrarDropdownModulos();
   renderBarraModulos();
 }
- 
+
 const MenuView = {
   title: 'Almacén Fleet — WMS',
- 
+
   render() {
     return `
       <div class="welcome-screen">
@@ -159,10 +159,10 @@ const MenuView = {
       </div>
     `;
   },
- 
+
   afterRender() {
     renderBarraModulos();
   }
 };
- 
+
 Router.register('menu', MenuView);

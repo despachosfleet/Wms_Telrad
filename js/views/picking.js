@@ -122,7 +122,7 @@ const PickingListaView = {
                 <td>${(d.despachos_items || []).length}</td>
                 <td>${pillEstado(d._estadoVisual)}</td>
                 <td><button class="btn-text" data-ver-detalle="${d.id}">Ver detalle</button></td>
-                <td><button class="btn-text" data-picar="${d.id}">Picar</button></td>
+                <td><button class="btn-text" data-picar="${d.id}">Pickear</button></td>
               </tr>
             `).join('')}
           </tbody>
@@ -144,7 +144,7 @@ Router.register('picking-lista', PickingListaView);
 // ============================================================
 // DETALLE DE ORDEN: lista completa de items (SKU, descripcion,
 // cantidad, serie, pedido) antes de empezar a pickear. Boton
-// "Picar" arriba lleva a la pantalla real de pickeo por lineas.
+// "Pickear" arriba lleva a la pantalla real de pickeo por lineas.
 // ============================================================
 const PickingDetalleView = {
   title: 'Detalle de la orden',
@@ -177,7 +177,7 @@ const PickingDetalleView = {
               Destino: ${escapeHtml(despacho.destino || '-')} · Destinatario: ${escapeHtml(despacho.razon_social || '-')} · Cliente: ${escapeHtml(despacho.cliente || '-')}
             </p>
           </div>
-          <button class="btn-primary" id="btn-picar-detalle" style="width:auto; padding:9px 18px;">Picar</button>
+          <button class="btn-primary" id="btn-picar-detalle" style="width:auto; padding:9px 18px;">Pickear</button>
         </div>
         <div style="margin-top:8px;">${pillEstado(estadoVisual)}</div>
       </div>

@@ -17,14 +17,7 @@ const UbicacionesView = {
         <div class="field-grid">
           <div class="field">
             <label>Zona</label>
-            <select id="nu-zona">
-              <option value="A">A</option>
-              <option value="B">B</option>
-              <option value="C">C</option>
-              <option value="D">D</option>
-              <option value="E">E</option>
-              <option value="F">F</option>
-            </select>
+            <input type="text" id="nu-zona" maxlength="2" style="text-transform:uppercase;" />
           </div>
           <div class="field"><label>Pasillo</label><input type="text" id="nu-pasillo" value="01" /></div>
           <div class="field"><label>Posición</label><input type="text" id="nu-posicion" /></div>
@@ -46,12 +39,12 @@ const UbicacionesView = {
 
   afterRender() {
     document.getElementById('btn-crear-ubicacion').addEventListener('click', () => this.crearUbicacionNueva());
-    this.renderChips();
     this.cargarYRender();
   },
 
   renderChips() {
-    const zonas = ['TODAS', 'A', 'B', 'C', 'D', 'E', 'F'];
+    const zonasExistentes = [...new Set(this._todas.map(u => u.zona))].sort();
+    const zonas = ['TODAS', ...zonasExistentes];
     document.getElementById('chips-zona-ubic').innerHTML = zonas.map(z => `
       <button class="chip ${this._filtroZona === z ? 'active' : ''}" data-zona="${z}">${z === 'TODAS' ? 'Todas las zonas' : 'Zona ' + z}</button>
     `).join('');
@@ -85,6 +78,7 @@ const UbicacionesView = {
     const cont = document.getElementById('lista-ubic-cont');
     cont.innerHTML = `<div class="empty-state">Cargando ubicaciones...</div>`;
     this._todas = await obtenerTodasLasUbicaciones();
+    this.renderChips();
     this.renderLista();
   },
 
@@ -144,7 +138,7 @@ const UbicacionesView = {
   },
 
   async crearUbicacionNueva() {
-    const zona = document.getElementById('nu-zona').value;
+    const zona = document.getElementById('nu-zona').value.trim().toUpperCase();
     const pasillo = document.getElementById('nu-pasillo').value.trim() || '01';
     const posicion = document.getElementById('nu-posicion').value.trim();
     const sub = document.getElementById('nu-sub').value.trim();

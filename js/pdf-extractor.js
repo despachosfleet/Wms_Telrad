@@ -121,7 +121,7 @@ function parsearGuiaTelrad(texto) {
   const lineas = texto.split('\n').map(l => l.trim()).filter(Boolean);
 
   let inicio = lineas.findIndex(l => /SEC\s*\.?\s*CANT/i.test(l));
-  let fin = lineas.findIndex(l => /^Observaci/i.test(l));
+  let fin = lineas.findIndex(l => /^Observaci|^ENVIO\b/i.test(l));
   if (inicio === -1) {
     resultado.errores.push('No se detectaron items. Verifica que el PDF tenga el formato estándar de guía Telrad.');
     resultado.textoCrudo = texto;
@@ -131,78 +131,86 @@ function parsearGuiaTelrad(texto) {
 
   const bloque = lineas.slice(inicio + 1, fin);
 
-  // Codigo de producto suelto en su propia linea (ej: ENT96007867)
-  const patronCodigoSuelto = /^([A-Z]{2,5}\d{6,})$/;
-  // Linea de item: SEC CANT UM seguido del resto (codigo y/o serie y/o descripcion)
-  const patronSecCantUm = /^(\d{1,3})\s+([\d,.]+)\s+(UND|MT|MTS|M)\s+(.+)$/;
-  // Primer token del "resto": puede ser el CODIGO real (ENT96007867,
-  // o numerico puro como 1004177 para SKU propios de Telrad)
-  const patronPrimerToken = /^(\S+)\s+(.*)$/;
-  // Serie: token largo alfanumerico al final de la linea
-  const patronSerieFinal = /\b(\d{6,}[A-Z0-9]{4,}|\d{15,})\b\s*$/;
-  // Identificador de pedido/paleta al inicio de lo que queda despues
-  // del codigo (ej: "MR-304", "Q&S-TELRAD", o numero de pedido largo)
-  const patronIdentificador = /^([A-Z][A-Z&]*-[A-Z0-9]+|\d{7,})\s+/;
+  // Linea que inicia un item: "SEC CANTIDAD UM resto"
+  const patronSecInicio = /^(\d{1,3})\s+([\d,.]+)\s+(UND|MT|MTS|M)\b(.*)$/;
+  // Token tipo codigo (ENT+digitos, u otro prefijo de letras+digitos, o
+  // numero puro de 6+ digitos) - usado tanto para detectar huerfanos
+  // como para tomar el codigo al inicio del cuerpo de un item.
+  const patronTokenCodigo = /^([A-Z]{2,5}\d{6,}|\d{6,})$/;
+  const patronCodigoAlInicio = /^([A-Z]{2,5}\d{6,}|\d{6,})\b\s*(.*)$/;
+  // Serie: token largo alfanumerico (con letras) en cualquier posicion
+  const patronSerie = /\b(\d{6,}[A-Z0-9]{4,})\b/;
+  // Identificador de pedido/paleta al inicio de lo que queda tras
+  // quitar codigo y serie (ej: "MR-304", "Q&S-TELRAD", o numero puro)
+  const patronIdentificador = /^([A-Z][A-Z&]*-[A-Z0-9]+|\d{6,})\b\s*(.*)$/;
 
-  let codigoPendiente = null;
+  // Paso 1: dividir el bloque en items segun donde empieza cada "SEC CANT UM"
+  const indicesInicio = [];
+  bloque.forEach((l, i) => { if (patronSecInicio.test(l)) indicesInicio.push(i); });
 
-  for (let i = 0; i < bloque.length; i++) {
-    const linea = bloque[i];
+  const items = indicesInicio.map((iInicio, idxN) => {
+    const iFin = idxN + 1 < indicesInicio.length ? indicesInicio[idxN + 1] : bloque.length;
+    const lineasItem = bloque.slice(iInicio, iFin);
+    const m = lineasItem[0].match(patronSecInicio);
+    const [, sec, cantStr, um, resto] = m;
+    const cuerpo = (resto.trim() ? [resto.trim()] : []).concat(lineasItem.slice(1));
+    return { sec, cantStr, um, cuerpo, codigo: null };
+  });
 
-    if (patronCodigoSuelto.test(linea)) {
-      codigoPendiente = linea;
-      continue;
+  // Paso 2: propagar codigos "huerfanos" (linea que es SOLO un codigo,
+  // al final del cuerpo de un item) hacia el item SIGUIENTE, que es a
+  // quien realmente pertenece (confirmado en guias reales).
+  for (let i = 0; i < items.length - 1; i++) {
+    const actual = items[i];
+    const siguiente = items[i + 1];
+    const ultimaLinea = actual.cuerpo[actual.cuerpo.length - 1];
+    if (ultimaLinea && patronTokenCodigo.test(ultimaLinea) && !siguiente.codigo) {
+      siguiente.codigo = ultimaLinea;
+      actual.cuerpo = actual.cuerpo.slice(0, -1);
     }
+  }
 
-    const m = linea.match(patronSecCantUm);
-    if (!m) continue;
+  // Paso 3: si un item aun no tiene codigo (no le llego huerfano),
+  // tomarlo del inicio de su propio cuerpo.
+  items.forEach(it => {
+    if (it.codigo || it.cuerpo.length === 0) return;
+    const mCod = it.cuerpo[0].match(patronCodigoAlInicio);
+    if (mCod) {
+      it.codigo = mCod[1];
+      it.cuerpo[0] = mCod[2];
+    }
+  });
 
-    const [, sec, cantStr, um, restoCompleto] = m;
-    let codigo = codigoPendiente;
+  // Paso 4: extraer serie (en cualquier posicion del texto restante) y
+  // despues identificador de pedido (al inicio de lo que quede); lo
+  // que sobra es la descripcion.
+  items.forEach(it => {
+    let textoCompleto = it.cuerpo.join(' ').replace(/\s+/g, ' ').trim();
+
     let serie = null;
-    let resto = restoCompleto;
-
-    // Si no hay codigo pendiente de la linea anterior, el primer token
-    // de "resto" es el codigo real (sea ENT... o numerico puro)
-    if (!codigo) {
-      const mTok = resto.match(patronPrimerToken);
-      if (mTok) {
-        codigo = mTok[1];
-        resto = mTok[2];
-      }
+    const mSerie = textoCompleto.match(patronSerie);
+    if (mSerie) {
+      serie = mSerie[1];
+      textoCompleto = (textoCompleto.slice(0, mSerie.index) + textoCompleto.slice(mSerie.index + mSerie[0].length)).trim();
     }
 
-    let descripcion = resto;
-
-    if (!serie) {
-      const mSerie = descripcion.match(patronSerieFinal);
-      if (mSerie) {
-        serie = mSerie[1];
-        descripcion = descripcion.slice(0, mSerie.index).trim();
-      }
-    }
-
-    // Identificador de pedido al inicio de lo que queda (despues del
-    // codigo, antes de la descripcion en si)
     let identificadorPedido = null;
-    const mIdent = descripcion.match(patronIdentificador);
+    const mIdent = textoCompleto.match(patronIdentificador);
     if (mIdent) {
       identificadorPedido = mIdent[1];
-      descripcion = descripcion.slice(mIdent[0].length).trim();
+      textoCompleto = mIdent[2];
     }
 
     resultado.items.push({
-      sec: Number(sec),
-      cantidad: Number(cantStr.replace(/,/g, '')),
-      um: um,
-      codigo: codigo || null,
-      serie: serie || null,
+      sec: Number(it.sec),
+      cantidad: Number(it.cantStr.replace(/,/g, '')),
+      um: it.um,
+      codigo: it.codigo || null,
+      serie: serie,
       identificadorPedido: identificadorPedido,
-      descripcion: descripcion.trim()
+      descripcion: textoCompleto.trim()
     });
-
-    codigoPendiente = null;
-  }
+  });
 
   if (resultado.items.length === 0) {
     resultado.errores.push('No se detectaron items. Verifica que el PDF tenga el formato estándar de guía Telrad.');
