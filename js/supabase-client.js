@@ -889,3 +889,12 @@ async function obtenerStockPorId(stockId) {
   if (error) { console.error('Error obtenerStockPorId:', error); return null; }
   return data;
 }
+
+// Actualiza solo la observación de un item de despacho (usado en picking)
+async function actualizarObservacionItem(itemId, observacion) {
+  const { error } = await sb
+    .from('despachos_items')
+    .update({ observaciones: observacion })
+    .eq('id', itemId);
+  return { error };
+}

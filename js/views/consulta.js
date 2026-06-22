@@ -1,223 +1,145 @@
 // ============================================================
-// VISTA: CONSULTA DE INVENTARIO (panel de filtros + tabla)
+// CONSULTA DE STOCK — Panel de filtros + tabla densa
 // ============================================================
-
 const ConsultaView = {
-  title: 'Consulta de inventario',
-  _orden: 'id',
+  title: 'Consultar stock',
+  _resultados: [],
+  _orden: 'sku',
   _dir: 'asc',
-  _datos: [],
 
   render() {
     return `
       <div class="card">
-        <p class="card-title">Filtros de búsqueda</p>
-        <div class="field-grid">
-          <div class="field">
-            <label>SKU</label>
-            <input type="text" id="f-sku" placeholder="" />
-          </div>
-          <div class="field">
-            <label>Serie</label>
-            <input type="text" id="f-serie" placeholder="" />
-          </div>
-          <div class="field">
-            <label>Ubicación</label>
-            <input type="text" id="f-ubic" placeholder="" />
-          </div>
-          <div class="field">
-            <label>Paleta/Pedido</label>
-            <input type="text" id="f-paleta" placeholder="" />
-          </div>
-          <div class="field">
-            <label>Descripción</label>
-            <input type="text" id="f-descripcion" placeholder="" />
-          </div>
-          <div class="field">
-            <label>Cliente</label>
+        <div class="field-grid" style="margin-bottom:8px;">
+          <div class="field"><label>SKU / Código</label><input id="f-sku" type="text" autocomplete="off"></div>
+          <div class="field"><label>Serie</label><input id="f-serie" type="text" autocomplete="off" style="font-family:monospace;"></div>
+        </div>
+        <div class="field-grid" style="margin-bottom:8px;">
+          <div class="field"><label>Pedido / Paleta</label><input id="f-paleta" type="text" autocomplete="off"></div>
+          <div class="field"><label>Ubicación</label><input id="f-ubic" type="text" autocomplete="off"></div>
+        </div>
+        <div class="field-grid" style="margin-bottom:12px;">
+          <div class="field"><label>Cliente</label>
             <select id="f-cliente">
               <option value="">Todos</option>
-              <option value="ENTEL">ENTEL</option>
-              <option value="CLARO">CLARO</option>
-              <option value="TELRAD">TELRAD</option>
-              <option value="AMERICATEL">AMERICATEL</option>
+              <option>ENTEL</option><option>CLARO</option><option>TELRAD</option>
             </select>
           </div>
-          <div class="field">
-            <label>Estado</label>
+          <div class="field"><label>Estado</label>
             <select id="f-estado">
               <option value="">Todos</option>
-              <option value="DISPONIBLE">Disponible</option>
-              <option value="DESPACHADO">Despachado</option>
+              <option>DISPONIBLE</option><option>DESPACHADO</option><option>RESERVADO</option>
             </select>
           </div>
         </div>
-        <div style="display:flex; gap:6px; margin-top:10px;">
-          <button class="btn-primary" id="btn-buscar" style="width:auto;">Buscar</button>
-          <button class="btn-secondary" id="btn-limpiar">Limpiar</button>
-        </div>
+        <button class="btn-primary" id="btn-buscar" style="width:100%;">Buscar</button>
       </div>
-
-      <p class="result-count" id="contador">Ingresa al menos un filtro y presiona Buscar.</p>
-      <div id="resultados"></div>
+      <div id="cont-resultado"></div>
     `;
   },
 
   afterRender() {
-    this._orden = 'id';
-    this._dir = 'asc';
-    this._datos = [];
-
-    document.getElementById('btn-buscar').addEventListener('click', () => this.buscar());
-    document.getElementById('btn-limpiar').addEventListener('click', () => this.limpiar());
-
-    // Enter en cualquier campo de texto dispara la busqueda
-    ['f-sku','f-serie','f-ubic','f-paleta','f-descripcion'].forEach(id => {
-      document.getElementById(id).addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') this.buscar();
+    document.getElementById('btn-buscar').addEventListener('click', () => this._buscar());
+    // Buscar al presionar Enter en cualquier campo
+    ['f-sku','f-serie','f-paleta','f-ubic'].forEach(id => {
+      document.getElementById(id)?.addEventListener('keydown', e => {
+        if (e.key === 'Enter') this._buscar();
       });
     });
   },
 
-  limpiar() {
-    ['f-sku','f-serie','f-ubic','f-paleta','f-descripcion'].forEach(id => document.getElementById(id).value = '');
-    document.getElementById('f-cliente').value = '';
-    document.getElementById('f-estado').value = '';
-    document.getElementById('resultados').innerHTML = '';
-    document.getElementById('contador').textContent = 'Ingresa al menos un filtro y presiona Buscar.';
-    this._datos = [];
+  async _buscar() {
+    const btn = document.getElementById('btn-buscar');
+    const cont = document.getElementById('cont-resultado');
+    btn.disabled = true; btn.textContent = 'Buscando…';
+    cont.innerHTML = '';
+
+    const params = {
+      sku: document.getElementById('f-sku').value.trim(),
+      serie: document.getElementById('f-serie').value.trim(),
+      paleta: document.getElementById('f-paleta').value.trim(),
+      ubic: document.getElementById('f-ubic').value.trim(),
+      cliente: document.getElementById('f-cliente').value,
+      estado: document.getElementById('f-estado').value,
+      orden: this._orden, dir: this._dir, limit: 200
+    };
+
+    this._resultados = await buscarStockAvanzado(params);
+    btn.disabled = false; btn.textContent = 'Buscar';
+    this._renderTabla();
   },
 
-  async buscar() {
-    const sku = document.getElementById('f-sku').value.trim();
-    const serie = document.getElementById('f-serie').value.trim();
-    const ubic = document.getElementById('f-ubic').value.trim();
-    const paleta = document.getElementById('f-paleta').value.trim();
-    const descripcion = document.getElementById('f-descripcion').value.trim();
-    const cliente = document.getElementById('f-cliente').value;
-    const estado = document.getElementById('f-estado').value;
+  _renderTabla() {
+    const cont = document.getElementById('cont-resultado');
+    const r = this._resultados;
 
-    const cont = document.getElementById('resultados');
-    const contador = document.getElementById('contador');
-
-    cont.innerHTML = '<div class="loading">Buscando...</div>';
-
-    const { data, error } = await buscarStockAvanzado({ sku, serie, ubic, paleta, descripcion, cliente, estado, orden: this._orden, dir: this._dir, limit: 200 });
-
-    if (error) {
-      cont.innerHTML = '<div class="empty-state">Error al conectar con la base de datos.</div>';
-      contador.textContent = '';
+    if (!r.length) {
+      cont.innerHTML = `<div class="empty-state"><strong>Sin resultados</strong>Prueba con otros filtros.</div>`;
       return;
     }
 
-    this._datos = data;
-    contador.textContent = `${data.length} resultado${data.length === 1 ? '' : 's'}`;
+    const thBtn = (campo, label) => {
+      const activo = this._orden === campo;
+      const ico = activo ? (this._dir === 'asc' ? ' ↑' : ' ↓') : '';
+      return `<th style="cursor:pointer;" data-col="${campo}">${label}${ico}</th>`;
+    };
 
-    if (data.length === 0) {
-      cont.innerHTML = '<div class="empty-state">Sin resultados para estos filtros.</div>';
-      return;
-    }
-
-    this.renderTabla();
-  },
-
-  renderTabla() {
-    const cont = document.getElementById('resultados');
-    const data = this._datos;
-
-    const cols = [
-      { key: 'sku', label: 'SKU' },
-      { key: 'descripcion', label: 'Descripción' },
-      { key: 'cantidad', label: 'Cant.' },
-      { key: 'ubicacion_fisica', label: 'Ubicación' },
-      { key: 'paleta_pedido', label: 'Paleta/Ped' },
-      { key: 'cliente', label: 'Cliente' },
-      { key: 'estado', label: 'Estado' }
-    ];
-
-    const arrow = (key) => this._orden === key ? `<span class="sort-arrow">${this._dir === 'asc' ? '▲' : '▼'}</span>` : '';
-
-    let html = `
+    cont.innerHTML = `
+      <p style="font-size:11px; color:var(--text-tertiary); margin-bottom:6px;">${r.length} resultado${r.length !== 1 ? 's' : ''}</p>
       <div class="table-wrap">
-        <table class="data-table">
-          <thead><tr>${cols.map(c => `<th data-col="${c.key}">${c.label}${arrow(c.key)}</th>`).join('')}</tr></thead>
+        <table class="data-table" id="tabla-stock">
+          <thead><tr>
+            ${thBtn('sku','SKU')}
+            ${thBtn('descripcion','Descripción')}
+            ${thBtn('cantidad','Cant.')}
+            ${thBtn('serie','Serie')}
+            ${thBtn('paleta_pedido','Pedido/Paleta')}
+            ${thBtn('ubicacion_fisica','Ubicación')}
+            ${thBtn('cliente','Cliente')}
+            ${thBtn('estado','Estado')}
+          </tr></thead>
           <tbody>
+            ${r.map(row => `
+              <tr>
+                <td class="sku-cell">${escapeHtml(row.sku || '-')}</td>
+                <td class="wrap">${escapeHtml(row.descripcion || '-')}</td>
+                <td>${formatNum(row.cantidad)}</td>
+                <td style="font-family:monospace; font-size:11px;">${escapeHtml(row.serie || '-')}</td>
+                <td>${escapeHtml(row.paleta_pedido || '-')}</td>
+                <td>${escapeHtml(row.ubicacion_fisica || '-')}</td>
+                <td>${escapeHtml(row.cliente || '-')}</td>
+                <td>${row.estado === 'DISPONIBLE'
+                  ? '<span class="pill pill-success">Disponible</span>'
+                  : row.estado === 'RESERVADO'
+                  ? '<span class="pill pill-warning">Reservado</span>'
+                  : '<span class="pill pill-neutral">'+escapeHtml(row.estado||'-')+'</span>'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
     `;
 
-    data.forEach((item, i) => {
-      const pill = item.estado === 'DISPONIBLE'
-        ? '<span class="pill pill-success">Disponible</span>'
-        : item.estado === 'DESPACHADO'
-          ? '<span class="pill pill-neutral">Despachado</span>'
-          : `<span class="pill pill-warning">${escapeHtml(item.estado || '')}</span>`;
-
-      html += `
-        <tr data-idx="${i}">
-          <td class="sku-cell">${escapeHtml(item.sku || '')}</td>
-          <td class="wrap">${escapeHtml((item.descripcion || '').slice(0, 70))}</td>
-          <td class="num-cell">${formatNum(item.cantidad)} ${escapeHtml(item.unidad_medida || '')}</td>
-          <td>${escapeHtml(item.ubicacion_fisica || '-')}</td>
-          <td>${escapeHtml(item.paleta_pedido || '-')}</td>
-          <td>${escapeHtml(item.cliente || '-')}</td>
-          <td>${pill}</td>
-        </tr>
-        <tr class="detail-row-tr" data-detail-for="${i}" style="display:none;">
-          <td colspan="7" style="padding:0;">
-            <div class="row-detail-panel">
-              <div class="row-detail-grid">
-                <div style="grid-column: span 2;"><div class="item-label">Descripción</div><div class="item-value">${escapeHtml(item.descripcion || 'Sin descripción')}</div></div>
-                <div><div class="item-label">Serie</div><div class="item-value">${escapeHtml(item.serie || 'Sin serie')}</div></div>
-                <div><div class="item-label">Tipo</div><div class="item-value">${escapeHtml(item.tipo || '-')}</div></div>
-                <div><div class="item-label">Fecha ingreso</div><div class="item-value">${escapeHtml(item.fecha_ingreso || '-')}</div></div>
-                <div><div class="item-label">GR ingreso</div><div class="item-value">${escapeHtml(item.gr_ingreso || '-')}</div></div>
-              </div>
-            </div>
-          </td>
-        </tr>
-      `;
-    });
-
-    html += '</tbody></table></div>';
-    cont.innerHTML = html;
-
-    cont.querySelectorAll('thead th').forEach(th => {
+    cont.querySelectorAll('[data-col]').forEach(th => {
       th.addEventListener('click', () => {
         const col = th.dataset.col;
-        if (this._orden === col) { this._dir = this._dir === 'asc' ? 'desc' : 'asc'; }
+        if (this._orden === col) this._dir = this._dir === 'asc' ? 'desc' : 'asc';
         else { this._orden = col; this._dir = 'asc'; }
-        this._datos = this.ordenarLocal(this._datos, this._orden, this._dir);
-        this.renderTabla();
-      });
-    });
-
-    cont.querySelectorAll('tbody tr[data-idx]').forEach(tr => {
-      tr.addEventListener('click', () => {
-        const idx = tr.dataset.idx;
-        const detailTr = cont.querySelector(`tr[data-detail-for="${idx}"]`);
-        const isOpen = detailTr.style.display !== 'none';
-        cont.querySelectorAll('.detail-row-tr').forEach(d => d.style.display = 'none');
-        detailTr.style.display = isOpen ? 'none' : '';
+        this._resultados = this._ordenar(this._resultados, col, this._dir);
+        this._renderTabla();
       });
     });
   },
 
-  ordenarLocal(data, key, dir) {
-    const copia = [...data];
-    copia.sort((a, b) => {
-      let va = a[key], vb = b[key];
-      if (typeof va === 'number' || typeof vb === 'number') {
-        va = Number(va) || 0; vb = Number(vb) || 0;
-        return dir === 'asc' ? va - vb : vb - va;
-      }
-      va = (va || '').toString().toLowerCase();
-      vb = (vb || '').toString().toLowerCase();
+  _ordenar(arr, col, dir) {
+    return [...arr].sort((a, b) => {
+      const va = String(a[col] ?? '').toLowerCase();
+      const vb = String(b[col] ?? '').toLowerCase();
       if (va < vb) return dir === 'asc' ? -1 : 1;
       if (va > vb) return dir === 'asc' ? 1 : -1;
       return 0;
     });
-    return copia;
   }
 };
-
 
 Router.register('consulta', ConsultaView);
