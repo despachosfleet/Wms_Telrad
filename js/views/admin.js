@@ -1,4 +1,42 @@
 // ============================================================
+// ADMIN — helper compartido: búsqueda de stock con todos los filtros
+// ============================================================
+
+async function _adminBuscarStock(q, cont) {
+  if (!q) { cont.innerHTML = '<p class="msg-error">Ingresa un valor para buscar.</p>'; return null; }
+  cont.innerHTML = '<p style="font-size:11px; color:var(--text-tertiary);">Buscando…</p>';
+  const { data } = await buscarStockAvanzado({
+    sku: q, serie: q, descripcion: q, paleta: q, ubic: q, limit: 30
+  });
+  if (!data?.length) { cont.innerHTML = '<p class="msg-error">No se encontraron resultados.</p>'; return null; }
+  return data;
+}
+
+function _adminTablaStock(data, onSelect) {
+  return `
+    <div class="table-wrap" style="margin-top:8px;">
+      <table class="data-table">
+        <thead><tr><th>SKU</th><th>Descripción</th><th>Serie</th><th>Cant.</th><th>Paleta/Pedido</th><th>Ubic.</th><th></th></tr></thead>
+        <tbody>
+          ${data.map(r => `
+            <tr>
+              <td class="sku-cell">${escapeHtml(r.sku)}</td>
+              <td class="desc-cell" style="max-width:200px;">${escapeHtml((r.descripcion||'').substring(0,60))}</td>
+              <td class="serie-cell">${escapeHtml(r.serie||'-')}</td>
+              <td style="font-weight:700;">${formatNum(r.cantidad)}</td>
+              <td style="font-family:monospace; font-size:11px;">${escapeHtml(r.paleta_pedido||'-')}</td>
+              <td>${escapeHtml(r.ubicacion_fisica||'-')}</td>
+              <td><button class="btn-primary" style="padding:4px 10px; font-size:11px;" data-sel-stock="${r.id}"
+                onclick="(${onSelect.toString()})(${JSON.stringify(r)})">Seleccionar</button></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+// ============================================================
 // MÓDULO DE ADMINISTRACIÓN
 // Todas las operaciones de corrección, reversión y gestión
 // que antes requerían SQL manual ahora están en la interfaz
@@ -470,7 +508,7 @@ const AdminView = {
       const cont = document.getElementById('adm-resultado-stock');
       if (!q) return;
       cont.innerHTML = '<p class="msg-warning">Buscando…</p>';
-      const { data } = await buscarStockAvanzado({ sku: q, serie: q, paleta: q, limit: 20 });
+      const { data } = await buscarStockAvanzado({ sku: q, serie: q, paleta: q, descripcion: q, ubic: q, limit: 30 });
       if (!data?.length) { cont.innerHTML = '<p class="msg-error">No encontrado.</p>'; return; }
       cont.innerHTML = `
         <div class="table-wrap">
@@ -526,7 +564,7 @@ const AdminView = {
       const q = document.getElementById('adm-sku-ajuste').value.trim();
       const cont = document.getElementById('adm-resultado-ajuste');
       if (!q) return;
-      const { data } = await buscarStockAvanzado({ sku: q, serie: q, limit: 10 });
+      const { data } = await buscarStockAvanzado({ sku: q, serie: q, paleta: q, descripcion: q, limit: 20 });
       if (!data?.length) { cont.innerHTML = '<p class="msg-error">No encontrado.</p>'; return; }
       const r = data[0];
       cont.innerHTML = `
@@ -571,7 +609,7 @@ const AdminView = {
     document.getElementById('adm-btn-buscar-danado')?.addEventListener('click', async () => {
       const q = document.getElementById('adm-sku-danado').value.trim();
       const cont = document.getElementById('adm-resultado-danado');
-      const { data } = await buscarStockAvanzado({ sku: q, serie: q, limit: 10 });
+      const { data } = await buscarStockAvanzado({ sku: q, serie: q, paleta: q, descripcion: q, limit: 20 });
       if (!data?.length) { cont.innerHTML = '<p class="msg-error">No encontrado.</p>'; return; }
       cont.innerHTML = data.map(r => `
         <div class="card" style="margin-bottom:8px;">
@@ -616,7 +654,7 @@ const AdminView = {
     document.getElementById('adm-btn-buscar-cambpp')?.addEventListener('click', async () => {
       const q = document.getElementById('adm-sku-cambpp').value.trim();
       const cont = document.getElementById('adm-resultado-cambpp');
-      const { data } = await buscarStockAvanzado({ sku: q, serie: q, limit: 10 });
+      const { data } = await buscarStockAvanzado({ sku: q, serie: q, paleta: q, descripcion: q, limit: 20 });
       if (!data?.length) { cont.innerHTML = '<p class="msg-error">No encontrado.</p>'; return; }
       cont.innerHTML = data.map(r => `
         <div class="card" style="margin-bottom:8px;">

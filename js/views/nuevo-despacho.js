@@ -156,14 +156,14 @@ const NuevoDespachoView = {
                     <td><input type="text" value="${escapeHtml(it.sku)}"
                       style="font-family:monospace; font-size:11px; background:var(--bg-input); border:1px solid var(--border); border-radius:3px; padding:3px 6px; width:120px;"
                       onchange="NuevoDespachoView._ordenes[${i}].items[${ii}].sku=this.value"></td>
-                    <td class="wrap"><input type="text" value="${escapeHtml(it.descripcion||'')}"
-                      style="font-size:11px; background:var(--bg-input); border:1px solid var(--border); border-radius:3px; padding:3px 6px; width:100%;"
+                    <td style="min-width:250px;"><input type="text" value="${escapeHtml(it.descripcion||'')}"
+                      style="font-size:11px; background:var(--bg-input); border:1px solid var(--border); border-radius:3px; padding:3px 6px; width:100%; min-width:240px;"
                       onchange="NuevoDespachoView._ordenes[${i}].items[${ii}].descripcion=this.value"></td>
                     <td><input type="number" value="${it.cantidad}" min="1"
-                      style="font-size:12px; font-weight:700; background:var(--bg-input); border:1px solid var(--border); border-radius:3px; padding:3px 6px; width:70px; text-align:center;"
+                      style="font-size:13px; font-weight:800; background:var(--bg-input); border:1px solid var(--border); border-radius:3px; padding:3px 6px; width:65px; text-align:center; color:var(--accent);"
                       onchange="NuevoDespachoView._ordenes[${i}].items[${ii}].cantidad=Number(this.value)"></td>
-                    <td><input type="text" value="${escapeHtml(it.serie && !it.serie.startsWith('-') ? it.serie : '')}"
-                      style="font-family:monospace; font-size:11px; background:var(--bg-input); border:1px solid var(--border); border-radius:3px; padding:3px 6px; width:130px;"
+                    <td style="min-width:160px;"><input type="text" value="${escapeHtml(it.serie && !it.serie.startsWith('-') ? it.serie : '')}"
+                      style="font-family:monospace; font-size:11px; background:var(--bg-input); border:1px solid var(--border); border-radius:3px; padding:3px 6px; width:100%; min-width:150px;"
                       onchange="NuevoDespachoView._ordenes[${i}].items[${ii}].serie=this.value||null"></td>
                     <td><input type="text" value="${escapeHtml(it.pedido_pallet||'')}"
                       style="font-size:11px; background:var(--bg-input); border:1px solid var(--border); border-radius:3px; padding:3px 6px; width:110px;"
