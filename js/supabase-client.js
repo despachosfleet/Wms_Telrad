@@ -882,3 +882,10 @@ async function eliminarUbicacion(id) {
   const { error } = await sb.from('ubicaciones').delete().eq('id', id);
   return { error };
 }
+
+// Obtiene un item de stock por su ID (usado en picking cuando ya tiene stock asignado)
+async function obtenerStockPorId(stockId) {
+  const { data, error } = await sb.from('stock').select('*').eq('id', stockId).maybeSingle();
+  if (error) { console.error('Error obtenerStockPorId:', error); return null; }
+  return data;
+}

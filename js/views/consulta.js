@@ -219,15 +219,5 @@ const ConsultaView = {
   }
 };
 
-function escapeHtml(str) {
-  if (str === null || str === undefined) return '';
-  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-function formatNum(n) {
-  if (n === null || n === undefined) return '0';
-  const num = Number(n);
-  return num % 1 === 0 ? num.toLocaleString('es-PE') : num.toLocaleString('es-PE', { maximumFractionDigits: 2 });
-}
 
 Router.register('consulta', ConsultaView);

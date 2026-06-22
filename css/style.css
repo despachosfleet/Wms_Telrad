@@ -886,3 +886,25 @@ table.data-table td.num-cell {
   color: var(--text-tertiary);
   margin-top: 4px;
 }
+
+/* ===================== PILLS ADICIONALES ===================== */
+.pill-pendiente { background: var(--neutral-bg); color: var(--neutral-text); }
+.pill-info { background: var(--blue-100); color: var(--blue-700); }
+.pill-success { background: var(--success-bg); color: var(--success-text); }
+.pill-danger  { background: var(--danger-bg);  color: var(--danger-text); }
+.pill-warning { background: var(--warning-bg); color: var(--warning-text); }
+.pill-neutral { background: var(--neutral-bg); color: var(--neutral-text); }
+
+/* Stat cargando */
+.stat-loading { color: var(--text-tertiary); animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+/* Botón inline pickear en tabla */
+.btn-pickear-inline {
+  color: var(--amber-600);
+  font-weight: 700;
+}
+.btn-pickear-inline:hover { color: var(--amber-500); }
+
+/* Border-light fallback */
+.border-light { border-color: var(--border); }
