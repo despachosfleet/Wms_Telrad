@@ -548,10 +548,31 @@ async function obtenerKardex({ sku = '', limit = 50 } = {}) {
 // ============================================================
 
 async function guardarGuiasPendientes(guias) {
-  // Solo inserta GRs que no esten ya pendientes (evita duplicar
-  // si se vuelve a subir el mismo Excel). El indice unico en
-  // Supabase tambien protege esto a nivel de base de datos.
-  const filas = guias.map(g => ({
+  // Verificamos manualmente cuales GR ya estan pendientes, en vez de
+  // depender de upsert/onConflict (el indice unico en Supabase es
+  // parcial -solo aplica a estado=PENDIENTE- y eso no es compatible
+  // con onConflict de la API de Supabase, causa error al guardar).
+  const grsNuevos = guias.map(g => g.gr);
+
+  const { data: existentes, error: errBuscar } = await sb
+    .from('guias_pendientes')
+    .select('gr')
+    .eq('estado', 'PENDIENTE')
+    .in('gr', grsNuevos);
+
+  if (errBuscar) {
+    console.error('Error al verificar guias existentes:', errBuscar);
+    return { data: null, error: errBuscar };
+  }
+
+  const grsExistentes = new Set((existentes || []).map(e => e.gr));
+  const guiasAInsertar = guias.filter(g => !grsExistentes.has(g.gr));
+
+  if (guiasAInsertar.length === 0) {
+    return { data: [], error: null };
+  }
+
+  const filas = guiasAInsertar.map(g => ({
     gr: g.gr,
     cliente: g.cabecera ? g.cabecera.cliente : null,
     destino: g.cabecera ? g.cabecera.destino : null,
@@ -566,7 +587,7 @@ async function guardarGuiasPendientes(guias) {
 
   const { data, error } = await sb
     .from('guias_pendientes')
-    .upsert(filas, { onConflict: 'gr', ignoreDuplicates: true })
+    .insert(filas)
     .select();
 
   if (error) {

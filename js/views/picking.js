@@ -177,7 +177,7 @@ const PickingDetalleView = {
               Destino: ${escapeHtml(despacho.destino || '-')} · Destinatario: ${escapeHtml(despacho.razon_social || '-')} · Cliente: ${escapeHtml(despacho.cliente || '-')}
             </p>
           </div>
-          <button class="btn-primary" id="btn-picar-detalle" style="width:auto; padding:9px 18px;">Pickear</button>
+          <button class="btn-pickear" id="btn-picar-detalle">Pickear</button>
         </div>
         <div style="margin-top:8px;">${pillEstado(estadoVisual)}</div>
       </div>

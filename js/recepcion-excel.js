@@ -28,6 +28,7 @@ const COLUMNAS_RECEPCION = {
   'SKU': 'sku', 'CODIGO': 'sku', 'CÓDIGO': 'sku',
   'DESCRIPCION': 'descripcion', 'DESCRIPCIÓN': 'descripcion',
   'CANTIDAD': 'cantidad',
+  'SERIE': 'serie',
   'FECHA': 'fecha',
   'CLIENTE': 'cliente'
 };
@@ -94,7 +95,8 @@ async function agruparPedidosDeExcel(file) {
       pedidos[pedidoStr].items.push({
         sku: colMap.sku !== undefined && fila[colMap.sku] ? String(fila[colMap.sku]).trim() : null,
         descripcion: colMap.descripcion !== undefined && fila[colMap.descripcion] ? String(fila[colMap.descripcion]).trim() : null,
-        cantidad_esperada: colMap.cantidad !== undefined && fila[colMap.cantidad] ? Number(fila[colMap.cantidad]) : null
+        cantidad_esperada: colMap.cantidad !== undefined && fila[colMap.cantidad] ? Number(fila[colMap.cantidad]) : null,
+        serie_esperada: colMap.serie !== undefined && fila[colMap.serie] ? String(fila[colMap.serie]).trim() : null
       });
     }
 

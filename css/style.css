@@ -5,7 +5,14 @@
   --blue-100: #E8EFF8;
   --blue-50: #F2F6FC;
 
-  --bg-app: #F4F5F7;
+  /* Acento calido, inspirado en señalizacion industrial de almacen
+     (cinta de advertencia, chalecos, marcadores de pasillo) - se usa
+     con moderacion para botones de accion fisica (picking, escanear) */
+  --amber-600: #D97706;
+  --amber-500: #F59E0B;
+  --amber-50: #FFFBEB;
+
+  --bg-app: #F6F7F9;
   --bg-panel: #FFFFFF;
   --bg-row-alt: #FAFBFC;
   --bg-header: #1A2942;
@@ -14,7 +21,7 @@
   --text-secondary: #5B6472;
   --text-tertiary: #94A0AD;
 
-  --border: #DCE1E7;
+  --border: #E2E5EA;
   --border-strong: #C2C9D1;
 
   --success-bg: #E5F6EA;
@@ -26,8 +33,10 @@
   --neutral-bg: #EEF0F2;
   --neutral-text: #5B6472;
 
-  --radius-sm: 4px;
-  --radius-md: 6px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --shadow-card: 0 1px 2px rgba(16,24,40,0.04), 0 1px 3px rgba(16,24,40,0.06);
+  --shadow-card-hover: 0 4px 8px rgba(16,24,40,0.08), 0 2px 4px rgba(16,24,40,0.06);
 
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
   --font-mono: "SF Mono", "Consolas", monospace;
@@ -183,8 +192,21 @@ html, body {
   margin: 8px 0 0;
 }
 
+.btn-pickear {
+  background: var(--amber-600);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 9px 18px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--shadow-card);
+}
+.btn-pickear:hover { filter: brightness(0.93); }
+
 .btn-despachar-sq {
-  background: var(--blue-600);
+  background: var(--amber-600);
   color: #fff;
   border: none;
   border-radius: var(--radius-sm);
@@ -193,6 +215,7 @@ html, body {
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
+  box-shadow: var(--shadow-card);
 }
 .btn-despachar-sq:hover { filter: brightness(0.92); }
 
@@ -358,11 +381,11 @@ html, body {
 /* ===================== MAIN LAYOUT ===================== */
 main {
   flex: 1;
-  padding: 14px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  max-width: 100%;
+  gap: 12px;
+  max-width: 1100px;
   margin: 0 auto;
   width: 100%;
 }
@@ -641,8 +664,10 @@ table.data-table td.num-cell {
 .card {
   background: var(--bg-panel);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 14px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: 16px;
+  margin-bottom: 12px;
 }
 .card-title {
   font-size: 10.5px;
@@ -809,9 +834,15 @@ table.data-table td.num-cell {
   align-items: center;
   gap: 8px;
   border: 1.5px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: 10px 14px;
   background: #fff;
+  max-width: 420px;
+}
+.search-bar:focus-within {
+  border-color: var(--amber-500);
+  box-shadow: 0 0 0 3px var(--amber-50);
 }
 .search-bar svg {
   width: 16px;

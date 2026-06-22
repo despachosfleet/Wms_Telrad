@@ -11,6 +11,10 @@ const NuevoPickingView = {
   title: 'Nueva orden de picking',
   _modoAbierto: null,
   _filas: [],
+
+  tieneCambiosSinGuardar() {
+    return this._modoAbierto !== null && this._filas.some(f => f.sku && f.sku.trim());
+  },
   _guiaActivaId: null,
 
   render() {
@@ -486,6 +490,7 @@ const NuevoPickingView = {
       await marcarGuiaPendienteProcesada(this._guiaActivaId, data.id);
     }
 
+    this._filas = [];
     Router.navigate('picking', { despachoId: data.id });
   }
 };

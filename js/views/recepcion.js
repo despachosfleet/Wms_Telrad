@@ -47,6 +47,7 @@ const RecepcionView = {
             <tr><td><strong>SKU</strong></td><td>Código del producto</td></tr>
             <tr><td><strong>DESCRIPCION</strong></td><td>Descripción del producto</td></tr>
             <tr><td><strong>CANTIDAD</strong></td><td>Cantidad esperada</td></tr>
+            <tr><td><strong>SERIE</strong></td><td>Opcional, si el cliente la especifica</td></tr>
           </table>
           <p class="format-guide-note">El resto de columnas que traiga el archivo se ignoran. Solo debe haber 1 fila por SKU/pedido.</p>
         </div>
@@ -136,7 +137,8 @@ const RecepcionView = {
       descripcion: it.descripcion || '',
       cantidad_esperada: it.cantidad_esperada,
       cantidad_recibida: it.cantidad_esperada != null ? String(it.cantidad_esperada) : '',
-      serie: '',
+      serie_esperada: it.serie_esperada || '',
+      serie: it.serie_esperada || '',
       observacion: ''
     }));
 
@@ -166,7 +168,7 @@ const RecepcionView = {
     cont.innerHTML = this._itemsConfirmacion.map((it, i) => `
       <div class="card" style="margin-bottom:8px;">
         <div style="font-size:12.5px; font-weight:600;">${escapeHtml(it.sku)}</div>
-        <div style="font-size:11px; color:var(--text-secondary); margin-bottom:8px;">${escapeHtml(it.descripcion || '')} · esperado: ${it.cantidad_esperada != null ? formatNum(it.cantidad_esperada) : '-'}</div>
+        <div style="font-size:11px; color:var(--text-secondary); margin-bottom:8px;">${escapeHtml(it.descripcion || '')} · esperado: ${it.cantidad_esperada != null ? formatNum(it.cantidad_esperada) : '-'}${it.serie_esperada ? ' · serie esperada: ' + escapeHtml(it.serie_esperada) : ''}</div>
         <div class="field-grid">
           <div class="field">
             <label>Cantidad recibida</label>
