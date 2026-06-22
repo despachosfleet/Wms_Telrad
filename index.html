@@ -3,44 +3,73 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Fleet WMS</title>
+<title>Fleet WMS — Telrad</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 <div id="app">
+
+  <!-- HEADER -->
   <header class="header">
     <div class="header-inner">
       <button id="btn-back" class="btn-icon" style="display:none;" aria-label="Volver">
         <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <span class="header-logo">▸</span>
-      <h1 id="page-title">Fleet WMS</h1>
+      <div class="header-logo">
+        ▸ <span>Fleet WMS</span>
+      </div>
+      <h1 id="page-title" style="flex:1;"></h1>
+      <div class="header-actions">
+        <button class="btn-icon" id="btn-config" onclick="toggleConfigPanel()" title="Configuración de apariencia">
+          <svg viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
+        <button class="btn-icon" onclick="Router.navigate('menu')" title="Inicio">
+          <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        </button>
+      </div>
     </div>
   </header>
 
+  <!-- PANEL DE CONFIGURACIÓN -->
+  <div class="config-panel" id="config-panel"></div>
+
+  <!-- NAV MÓDULOS -->
   <nav id="module-nav" class="module-nav"></nav>
   <div id="module-dropdown-panel" class="module-dropdown-panel" style="display:none;"></div>
 
+  <!-- CONTENIDO PRINCIPAL -->
   <main id="main-content"></main>
+
 </div>
 
+<!-- DEPENDENCIAS -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<!-- UTILIDADES Y CLIENTE -->
 <script src="js/utils.js"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/excel-matcher.js"></script>
 <script src="js/pdf-extractor.js"></script>
 <script src="js/scanner.js"></script>
 <script src="js/router.js"></script>
+
+<!-- VISTAS -->
 <script src="js/views/menu.js"></script>
-<script src="js/views/consulta.js"></script>
 <script src="js/views/nuevo-despacho.js"></script>
+<script src="js/views/validar-ordenes.js"></script>
 <script src="js/views/picking.js"></script>
 <script src="js/views/recepcion.js"></script>
 <script src="js/views/movimientos.js"></script>
+<script src="js/views/consulta.js"></script>
 <script src="js/views/ubicaciones.js"></script>
 <script src="js/views/kardex.js"></script>
 <script src="js/views/registro-despachos.js"></script>
-<script src="js/views/guias-pendientes.js"></script>
+<script src="js/views/admin.js"></script>
+
+<!-- ENTRY POINT (carga tema y arranca el router) -->
 <script src="js/app.js"></script>
 </body>
 </html>

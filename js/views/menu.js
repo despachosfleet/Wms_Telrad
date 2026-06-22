@@ -1,43 +1,48 @@
 // ============================================================
-// MENÚ PRINCIPAL + BARRA DE NAVEGACIÓN
+// MENÚ + BARRA DE NAVEGACIÓN
+// Módulos: Picking | Almacén | Consultas | Reportes | Admin
 // ============================================================
 
 const MODULOS = [
   {
-    id: 'mod-picking',
-    label: 'Picking',
-    icono: '<svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M3 8h18M5 8v12a1 1 0 001 1h12a1 1 0 001-1V8"/><line x1="10" y1="12" x2="14" y2="12"/><line x1="12" y1="10" x2="12" y2="14"/></svg>',
+    id: 'mod-picking', label: 'Picking',
+    icono: '<svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>',
     subs: [
-      { nav: 'nuevo-despacho',   label: 'Nueva orden de picking' },
-      { nav: 'picking-lista',    label: 'Órdenes pendientes' },
-      { nav: 'despachos-salidas',label: 'Despachos y salidas' },
+      { nav: 'nuevo-despacho',    label: 'Nueva orden de picking',  desc: 'Importar Excel de cadena' },
+      { nav: 'validar-ordenes',   label: 'Validar órdenes',         desc: 'Revisar y aprobar antes de pickear' },
+      { nav: 'picking-lista',     label: 'Órdenes de picking',      desc: 'Pendientes y en proceso' },
+      { nav: 'despachos-salidas', label: 'Despachos y salidas',     desc: 'Confirmar salida del almacén' },
     ]
   },
   {
-    id: 'mod-almacen',
-    label: 'Almacén',
+    id: 'mod-almacen', label: 'Almacén',
     icono: '<svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
     subs: [
-      { nav: 'recepcion',   label: 'Recepción' },
-      { nav: 'movimientos', label: 'Movimientos' },
-      { nav: 'ubicaciones', label: 'Ubicaciones' },
+      { nav: 'recepcion',   label: 'Recepción',   desc: 'Subir Excel de ingresos' },
+      { nav: 'movimientos', label: 'Movimientos', desc: 'Mover ítems o paletas' },
+      { nav: 'ubicaciones', label: 'Ubicaciones', desc: 'Ver y gestionar posiciones' },
     ]
   },
   {
-    id: 'mod-consulta',
-    label: 'Consultas',
+    id: 'mod-consultas', label: 'Consultas',
     icono: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
     subs: [
-      { nav: 'consulta', label: 'Consultar stock' },
+      { nav: 'consulta', label: 'Consultar stock', desc: 'Buscar por SKU, serie, paleta, ubicación' },
     ]
   },
   {
-    id: 'mod-reportes',
-    label: 'Reportes',
+    id: 'mod-reportes', label: 'Reportes',
     icono: '<svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>',
     subs: [
-      { nav: 'kardex',              label: 'Kardex' },
-      { nav: 'registro-despachos',  label: 'Registro de despachos' },
+      { nav: 'kardex',             label: 'Kardex',              desc: 'Historial de movimientos' },
+      { nav: 'registro-despachos', label: 'Registro despachos',  desc: 'Historial y exportar' },
+    ]
+  },
+  {
+    id: 'mod-admin', label: 'Admin',
+    icono: '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M12 14c-5 0-8 2-8 3v1h16v-1c0-1-3-3-8-3z"/><path d="M18 8l2 2-6 6-3-3 1.5-1.5L13 13l4-4-1-1z"/></svg>',
+    subs: [
+      { nav: 'admin', label: 'Administración', desc: 'Editar, revertir, regularizar stock' },
     ]
   },
 ];
@@ -55,7 +60,6 @@ function renderBarraModulos() {
       ${m.icono}<span>${m.label}</span>
     </button>
   `).join('');
-
   nav.querySelectorAll('[data-mod]').forEach(btn => {
     btn.addEventListener('click', e => {
       e.stopPropagation();
@@ -71,16 +75,18 @@ function abrirDropdown(modId, btnRef) {
   if (!mod) return;
   const panel = document.getElementById('module-dropdown-panel');
   const r = btnRef.getBoundingClientRect();
-  panel.innerHTML = mod.subs.map(s =>
-    `<button class="dropdown-option" data-nav-dd="${s.nav}">${escapeHtml(s.label)}</button>`
-  ).join('');
-  panel.style.left = Math.min(r.left, window.innerWidth - 210) + 'px';
+  panel.innerHTML = mod.subs.map(s => `
+    <button class="dropdown-option" data-nav-dd="${s.nav}">
+      <div style="font-weight:700;">${escapeHtml(s.label)}</div>
+      <div style="font-size:11px; color:var(--text-tertiary); margin-top:1px;">${escapeHtml(s.desc)}</div>
+    </button>
+  `).join('');
+  panel.style.left = Math.min(r.left, window.innerWidth - 220) + 'px';
   panel.style.top = r.bottom + 'px';
   panel.style.display = 'block';
   _dropdownAbierto = modId;
   _moduloActivo = modId;
   renderBarraModulos();
-
   panel.querySelectorAll('[data-nav-dd]').forEach(opt => {
     opt.addEventListener('click', e => {
       e.stopPropagation();
@@ -95,7 +101,6 @@ function cerrarDropdown() {
   if (p) p.style.display = 'none';
   _dropdownAbierto = null;
 }
-
 document.addEventListener('click', cerrarDropdown);
 
 function sincronizarModuloActivo(vista) {
@@ -108,37 +113,52 @@ function sincronizarModuloActivo(vista) {
 // DASHBOARD
 // ============================================================
 const MenuView = {
-  title: 'Fleet WMS',
+  title: 'Fleet WMS — Telrad',
 
   render() {
     return `
       <div id="dash-stats" class="dashboard-stats">
-        ${['Órdenes activas','Guías pendientes','Por recibir'].map(l => `
+        ${['Órdenes activas','Por validar','Por recibir','Alertas stock'].map((l,i) => `
           <div class="stat-card">
             <div class="stat-value stat-loading">…</div>
             <div class="stat-label">${l}</div>
           </div>
         `).join('')}
       </div>
+
       <p class="section-label">Accesos rápidos</p>
       <div class="menu-grid">
         <button class="menu-item" data-nav="nuevo-despacho">
-          <span>Nueva orden</span><small>Importar Excel o manual</small>
+          <div class="mi-icon">📋</div>
+          <span>Nueva orden</span><small>Importar Excel de cadena</small>
+        </button>
+        <button class="menu-item" data-nav="validar-ordenes">
+          <div class="mi-icon">✅</div>
+          <span>Validar órdenes</span><small>Revisar antes de pickear</small>
         </button>
         <button class="menu-item" data-nav="picking-lista">
-          <span>Órdenes de picking</span><small>Ver pendientes y en proceso</small>
+          <div class="mi-icon">📦</div>
+          <span>Picking</span><small>Órdenes pendientes</small>
         </button>
         <button class="menu-item" data-nav="consulta">
-          <span>Consultar stock</span><small>SKU, serie, paleta, ubicación</small>
+          <div class="mi-icon">🔍</div>
+          <span>Consultar stock</span><small>SKU, serie, paleta</small>
         </button>
         <button class="menu-item" data-nav="recepcion">
-          <span>Recepción</span><small>Registrar ingreso</small>
+          <div class="mi-icon">📥</div>
+          <span>Recepción</span><small>Subir Excel de ingresos</small>
         </button>
         <button class="menu-item" data-nav="movimientos">
-          <span>Movimientos</span><small>Mover ítem o paleta</small>
+          <div class="mi-icon">🔄</div>
+          <span>Movimientos</span><small>Mover ítems o paletas</small>
         </button>
         <button class="menu-item" data-nav="despachos-salidas">
+          <div class="mi-icon">🚛</div>
           <span>Despachos</span><small>Confirmar salida</small>
+        </button>
+        <button class="menu-item" data-nav="admin">
+          <div class="mi-icon">⚙️</div>
+          <span>Administración</span><small>Editar, revertir, limpiar</small>
         </button>
       </div>
     `;
@@ -154,30 +174,26 @@ const MenuView = {
 
   async _cargarStats() {
     try {
-      const [despachos, guias, recepciones] = await Promise.all([
+      const [despachos, borradores, recepciones] = await Promise.all([
         obtenerTodosLosDespachos({}).catch(() => []),
-        obtenerGuiasPendientes({ estado: 'PENDIENTE' }).catch(() => []),
+        obtenerOrdenesBorrador().catch(() => []),
         obtenerRecepcionesPendientes().catch(() => []),
       ]);
-
       const activas = despachos.filter(d => {
-        const est = calcularEstadoVisual(d);
-        return est === 'PENDIENTE' || est === 'EN_PROCESO';
+        const e = calcularEstadoVisual(d);
+        return e === 'PENDIENTE' || e === 'EN_PROCESO';
       }).length;
-
       const cont = document.getElementById('dash-stats');
       if (!cont) return;
-      const vals = [activas, guias.length, recepciones.length];
-      const labels = ['Órdenes activas','Guías pendientes','Por recibir'];
+      const vals  = [activas, borradores.length, recepciones.length, 0];
+      const labels = ['Órdenes activas','Por validar','Por recibir','Alertas stock'];
       cont.innerHTML = vals.map((v, i) => `
         <div class="stat-card">
           <div class="stat-value">${v}</div>
           <div class="stat-label">${labels[i]}</div>
         </div>
       `).join('');
-    } catch (e) {
-      console.error('Dashboard stats error:', e);
-    }
+    } catch(e) { console.error('Dashboard error:', e); }
   }
 };
 

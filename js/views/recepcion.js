@@ -1,126 +1,211 @@
 // ============================================================
-// RECEPCIÓN — Registrar ingreso de mercadería
-// Mobile-first: campos claros, sin placeholders confusos
+// RECEPCIÓN — Subir Excel de ingresos nuevos
+// Formato fijo de 10 columnas (del Sharepoint del cliente)
 // ============================================================
+
 const RecepcionView = {
   title: 'Recepción',
-  _items: [],
+  _preview: [],
 
   render() {
     return `
       <div class="card">
-        <p class="card-title">Datos del ingreso</p>
-        <div class="field-grid">
-          <div class="field"><label>N° Pedido / Paleta</label><input id="r-pedido" type="text" style="font-family:monospace;"></div>
-          <div class="field"><label>Cliente</label>
-            <select id="r-cliente">
-              <option value="">— Seleccionar —</option>
-              <option>ENTEL</option><option>CLARO</option><option>TELRAD</option>
-            </select>
-          </div>
+        <p class="card-title">Subir Excel de ingresos</p>
+        <p class="card-subtitle">
+          El archivo debe tener exactamente estas 10 columnas en este orden:
+        </p>
+        <div class="table-wrap" style="margin-bottom:14px;">
+          <table class="data-table">
+            <thead><tr>
+              <th>#</th><th>Columna</th><th>Descripción</th><th>Ejemplo</th>
+            </tr></thead>
+            <tbody>
+              ${[
+                ['1','FECHA','Fecha de ingreso','05/05/2026'],
+                ['2','CLIENTE','ENTEL, CLARO o TELRAD','ENTEL'],
+                ['3','N_PEDIDO','Número de pedido (cualquier formato)','MR-218'],
+                ['4','MATERIAL','Código SKU del artículo','ENT960051374'],
+                ['5','DESCRIPCION','Descripción del artículo','HUAWEI 25030432...'],
+                ['6','SERIE','Serie del artículo (o "-" si no tiene)','024QLM10R8103263'],
+                ['7','CANTIDAD_RECIBIDA','Cantidad recibida real','24'],
+                ['8','N_GUIA','Número de guía de ingreso','T217-00042276'],
+                ['9','TIPO_INGRESO','NUEVO, DESMONTADO, TRASPASO, CONTRATA, DEVOLUCION','NUEVO'],
+                ['10','OBSERVACIONES','Notas adicionales (puede quedar vacío)','SKU no coincide con GR'],
+              ].map(([n, col, desc, ej]) => `
+                <tr>
+                  <td style="color:var(--text-tertiary); font-weight:700;">${n}</td>
+                  <td class="sku-cell">${col}</td>
+                  <td style="font-size:11px;">${desc}</td>
+                  <td style="font-size:11px; color:var(--text-secondary);">${ej}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
         </div>
-        <div class="field"><label>GR de ingreso</label><input id="r-gr" type="text" style="font-family:monospace;"></div>
+
+        <div class="file-drop" id="file-drop-recep">
+          <div class="file-drop-icon">📥</div>
+          <strong>Seleccionar Excel de ingresos</strong>
+          .xlsx · 10 columnas en el orden indicado
+        </div>
+        <input type="file" id="input-recep" accept=".xlsx,.xls" style="display:none;">
       </div>
 
-      <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-          <p class="card-title" style="margin:0;">Ítems recibidos</p>
-          <button class="btn-text" id="btn-add-recep">+ Agregar</button>
-        </div>
-        <div id="items-recep-list">
-          <div class="empty-state" style="padding:16px;">Agrega los ítems recibidos.</div>
-        </div>
-      </div>
-
-      <button class="btn-primary" id="btn-registrar-recep" style="width:100%;">Registrar ingreso</button>
-      <div id="msg-recep" style="margin-top:8px;"></div>
+      <div id="preview-recep"></div>
+      <div id="resultado-recep"></div>
     `;
   },
 
   afterRender() {
-    this._items = [];
-    document.getElementById('btn-add-recep').addEventListener('click', () => this._agregarItem());
-    document.getElementById('btn-registrar-recep').addEventListener('click', () => this._registrar());
+    const drop  = document.getElementById('file-drop-recep');
+    const input = document.getElementById('input-recep');
+    drop.addEventListener('click', () => input.click());
+    drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag-over'); });
+    drop.addEventListener('dragleave', () => drop.classList.remove('drag-over'));
+    drop.addEventListener('drop', e => {
+      e.preventDefault(); drop.classList.remove('drag-over');
+      if (e.dataTransfer.files[0]) this._procesar(e.dataTransfer.files[0]);
+    });
+    input.addEventListener('change', e => {
+      if (e.target.files[0]) this._procesar(e.target.files[0]);
+    });
   },
 
-  _agregarItem() {
-    const i = this._items.length;
-    this._items.push({});
-    const list = document.getElementById('items-recep-list');
-    if (i === 0) list.innerHTML = '';
+  async _procesar(file) {
+    const preview = document.getElementById('preview-recep');
+    preview.innerHTML = '<div class="empty-state"><div class="empty-icon">⏳</div>Leyendo Excel…</div>';
 
-    const div = document.createElement('div');
-    div.className = 'recep-item';
-    div.id = `ri-${i}`;
-    div.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-        <span style="font-size:11px; font-weight:700; color:var(--text-secondary);">ÍTEM ${i + 1}</span>
-        <button class="btn-text" style="color:var(--danger-text);" onclick="document.getElementById('ri-${i}').remove()">Quitar</button>
-      </div>
-      <div class="field-grid">
-        <div class="field"><label>SKU</label><input id="ri-sku-${i}" type="text" style="font-family:monospace;"></div>
-        <div class="field"><label>Cantidad</label><input id="ri-cant-${i}" type="number" value="1" min="1"></div>
-      </div>
-      <div class="field-grid">
-        <div class="field"><label>Serie</label><input id="ri-serie-${i}" type="text" style="font-family:monospace;"></div>
-        <div class="field"><label>Unidad</label>
-          <select id="ri-um-${i}">
-            <option>UND</option><option>MTS</option><option>CJA</option><option>KIT</option>
-          </select>
+    try {
+      await cargarXlsx();
+      const buf = await file.arrayBuffer();
+      const wb  = XLSX.read(buf, { type: 'array' });
+
+      // Buscar la primera hoja con datos
+      let filas = [];
+      for (const nombre of wb.SheetNames) {
+        const ws = wb.Sheets[nombre];
+        const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        if (data.length > 1) { filas = data; break; }
+      }
+
+      if (!filas.length) {
+        preview.innerHTML = '<div class="alert alert-danger">El Excel está vacío o no tiene el formato esperado.</div>';
+        return;
+      }
+
+      // Detectar si la primera fila es encabezado (contiene texto) o datos
+      const COLS = ['FECHA','CLIENTE','N_PEDIDO','MATERIAL','DESCRIPCION','SERIE','CANTIDAD_RECIBIDA','N_GUIA','TIPO_INGRESO','OBSERVACIONES'];
+      let filaInicio = 0;
+      const primeraFila = filas[0];
+      // Si la primera fila tiene al menos 4 strings que coinciden con nuestras columnas, saltar
+      const matchCount = COLS.filter(c => primeraFila.some(v => String(v).toUpperCase().includes(c.substring(0,5)))).length;
+      if (matchCount >= 3) filaInicio = 1;
+
+      this._preview = filas.slice(filaInicio)
+        .filter(r => r.some(v => v !== '' && v !== null))
+        .map(r => ({
+          FECHA:              r[0],
+          CLIENTE:            String(r[1] || '').trim().toUpperCase(),
+          N_PEDIDO:           String(r[2] || '').trim(),
+          MATERIAL:           String(r[3] || '').trim().toUpperCase(),
+          DESCRIPCION:        String(r[4] || '').trim(),
+          SERIE:              String(r[5] || '').trim(),
+          CANTIDAD_RECIBIDA:  Number(r[6]) || 0,
+          N_GUIA:             String(r[7] || '').trim(),
+          TIPO_INGRESO:       String(r[8] || 'NUEVO').trim().toUpperCase() || 'NUEVO',
+          OBSERVACIONES:      String(r[9] || '').trim(),
+        }))
+        .filter(r => r.MATERIAL && r.CANTIDAD_RECIBIDA > 0);
+
+      if (!this._preview.length) {
+        preview.innerHTML = '<div class="alert alert-danger">No se encontraron filas válidas. Verifica que el Excel tenga las 10 columnas en el orden correcto y que CANTIDAD_RECIBIDA sea mayor a 0.</div>';
+        return;
+      }
+
+      this._renderPreview(preview);
+    } catch(err) {
+      preview.innerHTML = `<div class="alert alert-danger">Error al leer el Excel: ${escapeHtml(err.message)}</div>`;
+    }
+  },
+
+  _renderPreview(preview) {
+    const sinSerie = this._preview.filter(r => !r.SERIE || r.SERIE.startsWith('-')).length;
+    const pedidos  = [...new Set(this._preview.map(r => r.N_PEDIDO))];
+
+    preview.innerHTML = `
+      <div class="alert alert-info">
+        <div>
+          Se detectaron <strong>${this._preview.length} ítems</strong> en <strong>${pedidos.length} pedidos</strong>.
+          ${sinSerie > 0 ? `<br>${sinSerie} ítems sin serie (se cargarán sin serie).` : ''}
         </div>
       </div>
-      <div class="field"><label>Descripción</label><input id="ri-desc-${i}" type="text"></div>
+
+      <div class="table-wrap" style="margin-bottom:12px;">
+        <table class="data-table">
+          <thead><tr>
+            <th>Material</th><th>Descripción</th><th>Pedido</th>
+            <th>Cant.</th><th>Serie</th><th>Tipo ingreso</th><th>Cliente</th>
+          </tr></thead>
+          <tbody>
+            ${this._preview.slice(0, 50).map(r => `
+              <tr>
+                <td class="sku-cell">${escapeHtml(r.MATERIAL)}</td>
+                <td class="wrap" style="font-size:10px;">${escapeHtml(r.DESCRIPCION.substring(0,60))}${r.DESCRIPCION.length > 60 ? '…' : ''}</td>
+                <td style="font-family:monospace; font-size:11px;">${escapeHtml(r.N_PEDIDO)}</td>
+                <td style="font-weight:700; color:var(--accent);">${formatNum(r.CANTIDAD_RECIBIDA)}</td>
+                <td style="font-family:monospace; font-size:10px;">
+                  ${r.SERIE && !r.SERIE.startsWith('-') ? escapeHtml(r.SERIE) : '<span style="color:var(--text-tertiary);">Sin serie</span>'}
+                </td>
+                <td><span class="pill pill-neutral">${escapeHtml(r.TIPO_INGRESO)}</span></td>
+                <td>${escapeHtml(r.CLIENTE)}</td>
+              </tr>
+            `).join('')}
+            ${this._preview.length > 50 ? `
+              <tr><td colspan="7" style="text-align:center; font-size:11px; color:var(--text-tertiary); padding:8px;">
+                … y ${this._preview.length - 50} ítems más
+              </td></tr>
+            ` : ''}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn-primary" id="btn-cargar-ingresos">
+          Cargar ${this._preview.length} ítems al stock
+        </button>
+        <button class="btn-secondary" id="btn-cancelar-recep">Cancelar</button>
+      </div>
     `;
-    list.appendChild(div);
+
+    document.getElementById('btn-cargar-ingresos')?.addEventListener('click', () => this._cargar(preview));
+    document.getElementById('btn-cancelar-recep')?.addEventListener('click', () => {
+      preview.innerHTML = '';
+      this._preview = [];
+    });
   },
 
-  async _registrar() {
-    const pedido = document.getElementById('r-pedido').value.trim();
-    const cliente = document.getElementById('r-cliente').value;
-    const gr = document.getElementById('r-gr').value.trim();
-    const msg = document.getElementById('msg-recep');
+  async _cargar(preview) {
+    const btn = document.getElementById('btn-cargar-ingresos');
+    if (btn) { btn.disabled = true; btn.textContent = 'Cargando…'; }
 
-    if (!pedido) { msg.innerHTML = '<p class="msg-error">Ingresa el número de pedido o paleta.</p>'; return; }
-    if (!cliente) { msg.innerHTML = '<p class="msg-error">Selecciona el cliente.</p>'; return; }
+    const { error, count } = await registrarIngresosDesdeExcel(this._preview);
+    const resultado = document.getElementById('resultado-recep');
+    preview.innerHTML = '';
 
-    // Recoger ítems de los divs actuales en el DOM
-    const divs = document.querySelectorAll('[id^="ri-"][id$="0"], [id^="ri-"][id$="1"], [id^="ri-"][id$="2"], [id^="ri-"][id$="3"], [id^="ri-"][id$="4"], [id^="ri-"][id$="5"], [id^="ri-"][id$="6"], [id^="ri-"][id$="7"], [id^="ri-"][id$="8"], [id^="ri-"][id$="9"]');
-    const itemsDivs = document.querySelectorAll('.recep-item');
-    const items = [];
-    itemsDivs.forEach(d => {
-      const id = d.id.replace('ri-', '');
-      const sku = document.getElementById(`ri-sku-${id}`)?.value.trim();
-      const cant = Number(document.getElementById(`ri-cant-${id}`)?.value) || 0;
-      const serie = document.getElementById(`ri-serie-${id}`)?.value.trim() || null;
-      const um = document.getElementById(`ri-um-${id}`)?.value || 'UND';
-      const desc = document.getElementById(`ri-desc-${id}`)?.value.trim() || '';
-      if (sku && cant > 0) items.push({ sku, cantidad: cant, serie, unidad_medida: um, descripcion: desc });
-    });
-
-    if (!items.length) { msg.innerHTML = '<p class="msg-error">Agrega al menos un ítem.</p>'; return; }
-
-    const btn = document.getElementById('btn-registrar-recep');
-    btn.disabled = true; btn.textContent = 'Registrando…';
-
-    let ok = 0, err = 0;
-    for (const it of items) {
-      const { error } = await registrarIngreso({
-        sku: it.sku, descripcion: it.descripcion,
-        serie: it.serie, cantidad: it.cantidad,
-        unidad_medida: it.unidad_medida,
-        paleta_pedido: pedido, cliente, gr_ingreso: gr || null,
-        fecha_ingreso: new Date().toISOString().slice(0, 10),
-        usuario: null
-      });
-      if (error) err++; else ok++;
-    }
-
-    btn.disabled = false; btn.textContent = 'Registrar ingreso';
-    if (err === 0) {
-      msg.innerHTML = `<p class="msg-ok">✓ ${ok} ítem${ok !== 1 ? 's' : ''} registrado${ok !== 1 ? 's' : ''} correctamente.</p>`;
-      setTimeout(() => Router.navigate('recepcion'), 1500);
+    if (error) {
+      resultado.innerHTML = `<div class="alert alert-danger">Error al cargar: ${escapeHtml(String(error))}</div>`;
     } else {
-      msg.innerHTML = `<p class="msg-warning">${ok} ok · ${err} con error. Verifica los ítems con error.</p>`;
+      resultado.innerHTML = `
+        <div class="alert alert-success">
+          <strong>✓ ${count} ítems cargados al stock correctamente.</strong>
+        </div>
+        <div class="btn-row">
+          <button class="btn-secondary" id="btn-otra-recep">Cargar otro Excel</button>
+          <button class="btn-primary" id="btn-ver-stock">Ver en consultas →</button>
+        </div>
+      `;
+      document.getElementById('btn-otra-recep')?.addEventListener('click', () => Router.navigate('recepcion'));
+      document.getElementById('btn-ver-stock')?.addEventListener('click', () => Router.navigate('consulta'));
     }
   }
 };

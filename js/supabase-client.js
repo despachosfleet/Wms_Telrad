@@ -124,7 +124,7 @@ async function buscarStockPorSKU(sku, soloDisponible = true) {
 // FUNCIONES DE ACCESO A DATOS - DESPACHOS
 // ============================================================
 
-async function crearDespacho({ gr, fecha, cliente, destino, razonSocial, contrata, consignatarios, observaciones, items }) {
+async function crearDespacho({ gr, fecha, cliente, destino, razonSocial, contrata, consignatarios, observaciones, items, status }) {
   // Nota: aqui NO se busca ni reserva stock todavia (stock_id viene
   // null). El cruce contra stock (mudanza/ingreso nuevo) y la reserva
   // ocurren en la pantalla de Picking, al abrir cada item -asi se evita
@@ -142,7 +142,7 @@ async function crearDespacho({ gr, fecha, cliente, destino, razonSocial, contrat
       contrata: contrata || null,
       consignatarios: consignatarios || null,
       observaciones: observaciones || null,
-      status: 'PENDIENTE'
+      status: status || 'PENDIENTE'
     }])
     .select()
     .single();
@@ -897,4 +897,189 @@ async function actualizarObservacionItem(itemId, observacion) {
     .update({ observaciones: observacion })
     .eq('id', itemId);
   return { error };
+}
+
+// ============================================================
+// FUNCIONES ADICIONALES — Admin, Validación, Recepción Excel
+// ============================================================
+
+// Obtener órdenes en estado BORRADOR
+async function obtenerOrdenesBorrador() {
+  const { data, error } = await sb
+    .from('despachos')
+    .select('*, despachos_items(*)')
+    .eq('status', 'BORRADOR')
+    .order('creado_en', { ascending: false });
+  if (error) { console.error('obtenerOrdenesBorrador:', error); return []; }
+  return data || [];
+}
+
+// Aprobar orden borrador → PENDIENTE (ya puede pickearse)
+async function aprobarOrdenBorrador(despachoId) {
+  const { error } = await sb.from('despachos')
+    .update({ status: 'PENDIENTE' })
+    .eq('id', despachoId);
+  return { error };
+}
+
+// Anular orden borrador (eliminar)
+async function anularOrdenBorrador(despachoId) {
+  await sb.from('despachos_items').delete().eq('despacho_id', despachoId);
+  const { error } = await sb.from('despachos').delete().eq('id', despachoId);
+  return { error };
+}
+
+// Anular orden completa (cualquier estado sin DESPACHADO)
+async function anularOrdenCompleta(despachoId) {
+  await sb.from('despachos_items').delete().eq('despacho_id', despachoId);
+  const { error } = await sb.from('despachos').delete().eq('id', despachoId);
+  return { error };
+}
+
+// Revertir despacho — restaura stock y elimina el despacho
+async function revertirDespacho(despachoId) {
+  // Obtener ítems con stock_id asignado
+  const { data: items } = await sb.from('despachos_items')
+    .select('*').eq('despacho_id', despachoId);
+
+  // Restaurar cada ítem de stock
+  for (const it of (items || [])) {
+    if (!it.stock_id || !it.observaciones?.startsWith('PICKEADO')) continue;
+    const match = it.observaciones.match(/PICKEADO:\s*([\d.]+)/);
+    const cantRestaurar = match ? Number(match[1]) : it.cantidad;
+    const { data: stockRow } = await sb.from('stock').select('cantidad').eq('id', it.stock_id).single();
+    if (stockRow) {
+      await sb.from('stock').update({
+        cantidad: Number(stockRow.cantidad) + cantRestaurar,
+        estado: 'DISPONIBLE',
+        actualizado_en: new Date().toISOString()
+      }).eq('id', it.stock_id);
+    }
+    // Kardex entrada por reversión
+    await sb.from('kardex').insert([{
+      stock_id: it.stock_id, sku: it.sku,
+      tipo_movimiento: 'ENTRADA',
+      cantidad: cantRestaurar,
+      referencia: `Reversión despacho ${despachoId}`,
+      usuario: null
+    }]);
+  }
+
+  // Eliminar despacho
+  await sb.from('despachos_items').delete().eq('despacho_id', despachoId);
+  const { error } = await sb.from('despachos').delete().eq('id', despachoId);
+  return { error };
+}
+
+// Editar un ítem de stock
+async function editarStock(stockId, campos) {
+  const { error } = await sb.from('stock')
+    .update({ ...campos, actualizado_en: new Date().toISOString() })
+    .eq('id', stockId);
+  return { error };
+}
+
+// Ajustar inventario con kardex
+async function ajustarInventario(stockId, nuevaCantidad, motivo, observacion) {
+  const { data: row } = await sb.from('stock').select('*').eq('id', stockId).single();
+  if (!row) return { error: 'No encontrado' };
+  const diff = nuevaCantidad - Number(row.cantidad);
+  const { error } = await sb.from('stock').update({
+    cantidad: nuevaCantidad,
+    actualizado_en: new Date().toISOString()
+  }).eq('id', stockId);
+  if (!error) {
+    await sb.from('kardex').insert([{
+      stock_id: stockId, sku: row.sku,
+      tipo_movimiento: diff >= 0 ? 'ENTRADA' : 'SALIDA',
+      cantidad: Math.abs(diff),
+      referencia: `Ajuste: ${motivo}`,
+      usuario: observacion || null
+    }]);
+  }
+  return { error };
+}
+
+// Fusionar paletas: mover todos los ítems de origen a destino
+async function fusionarPaletas(origen, destino, motivo) {
+  const { data, error } = await sb.from('stock')
+    .update({ paleta_pedido: destino, actualizado_en: new Date().toISOString() })
+    .eq('paleta_pedido', origen)
+    .select();
+  return { error, count: data?.length || 0 };
+}
+
+// Revertir recepción por paleta/pedido (eliminar ítems)
+async function revertirRecepcionPorPaleta(paletaPedido) {
+  const { error } = await sb.from('stock')
+    .delete().eq('paleta_pedido', paletaPedido);
+  return { error };
+}
+
+// Cambiar estado de una orden
+async function cambiarEstadoOrden(despachoId, nuevoEstado) {
+  const { error } = await sb.from('despachos')
+    .update({ status: nuevoEstado })
+    .eq('id', despachoId);
+  return { error };
+}
+
+// Actualizar cantidad de ítem de despacho
+async function actualizarCantidadItem(itemId, cantidad) {
+  const { error } = await sb.from('despachos_items')
+    .update({ cantidad }).eq('id', itemId);
+  return { error };
+}
+
+// Actualizar serie de ítem de despacho
+async function actualizarSerieItem(itemId, serie) {
+  const { error } = await sb.from('despachos_items')
+    .update({ serie }).eq('id', itemId);
+  return { error };
+}
+
+// Actualizar paleta_pedido de ítem de despacho
+async function actualizarPaletaPedidoItem(itemId, paletaPedido) {
+  const { error } = await sb.from('despachos_items')
+    .update({ paleta_pedido: paletaPedido }).eq('id', itemId);
+  return { error };
+}
+
+// Limpiar TODOS los despachos y restaurar stock (solo para datos de prueba)
+async function limpiarDatosPrueba() {
+  // Restaurar stock a DISPONIBLE donde estaba RESERVADO
+  await sb.from('stock')
+    .update({ estado: 'DISPONIBLE', actualizado_en: new Date().toISOString() })
+    .eq('estado', 'RESERVADO');
+
+  // Eliminar todos los ítems y despachos
+  await sb.from('despachos_items').delete().neq('id', 0);
+  const { data, error } = await sb.from('despachos').delete().neq('id', 0).select();
+  return { error, count: data?.length || 0 };
+}
+
+// Registrar ingreso desde Excel de ingresos (formato fijo de 10 columnas)
+async function registrarIngresosDesdeExcel(filas) {
+  const inserts = filas.map(f => ({
+    sku: String(f.MATERIAL || '').trim().toUpperCase(),
+    descripcion: String(f.DESCRIPCION || '').trim(),
+    serie: f.SERIE && !String(f.SERIE).startsWith('-') ? String(f.SERIE).trim() : null,
+    cantidad: Number(f.CANTIDAD_RECIBIDA) || 0,
+    unidad_medida: 'UND',
+    paleta_pedido: String(f.N_PEDIDO || '').trim(),
+    cliente: String(f.CLIENTE || '').trim().toUpperCase(),
+    gr_ingreso: String(f.N_GUIA || '').trim() || null,
+    fecha_ingreso: f.FECHA ? new Date(f.FECHA).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+    estado: 'DISPONIBLE',
+    tipo: null, // se puede inferir después
+    condicion: String(f.TIPO_INGRESO || 'NUEVO').trim().toUpperCase(),
+    observaciones: String(f.OBSERVACIONES || '').trim() || null,
+    creado_en: new Date().toISOString(),
+    actualizado_en: new Date().toISOString()
+  })).filter(r => r.sku && r.cantidad > 0);
+
+  if (!inserts.length) return { error: 'Sin filas válidas', count: 0 };
+
+  const { data, error } = await sb.from('stock').insert(inserts).select();
+  return { error, count: data?.length || 0 };
 }
