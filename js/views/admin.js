@@ -508,7 +508,7 @@ const AdminView = {
       const cont = document.getElementById('adm-resultado-stock');
       if (!q) return;
       cont.innerHTML = '<p class="msg-warning">Buscando…</p>';
-      const { data } = await buscarStockAvanzado({ sku: q, serie: q, paleta: q, descripcion: q, ubic: q, limit: 30 });
+      const { data } = await buscarStockAvanzado({ textoLibre: q, limit: 30 });
       if (!data?.length) { cont.innerHTML = '<p class="msg-error">No encontrado.</p>'; return; }
       cont.innerHTML = `
         <div class="table-wrap">
@@ -564,7 +564,7 @@ const AdminView = {
       const q = document.getElementById('adm-sku-ajuste').value.trim();
       const cont = document.getElementById('adm-resultado-ajuste');
       if (!q) return;
-      const { data } = await buscarStockAvanzado({ sku: q, serie: q, paleta: q, descripcion: q, limit: 20 });
+      const { data } = await buscarStockAvanzado({ textoLibre: q, limit: 20 });
       if (!data?.length) { cont.innerHTML = '<p class="msg-error">No encontrado.</p>'; return; }
       const r = data[0];
       cont.innerHTML = `
@@ -609,7 +609,7 @@ const AdminView = {
     document.getElementById('adm-btn-buscar-danado')?.addEventListener('click', async () => {
       const q = document.getElementById('adm-sku-danado').value.trim();
       const cont = document.getElementById('adm-resultado-danado');
-      const { data } = await buscarStockAvanzado({ sku: q, serie: q, paleta: q, descripcion: q, limit: 20 });
+      const { data } = await buscarStockAvanzado({ textoLibre: q, limit: 20 });
       if (!data?.length) { cont.innerHTML = '<p class="msg-error">No encontrado.</p>'; return; }
       cont.innerHTML = data.map(r => `
         <div class="card" style="margin-bottom:8px;">
@@ -654,7 +654,7 @@ const AdminView = {
     document.getElementById('adm-btn-buscar-cambpp')?.addEventListener('click', async () => {
       const q = document.getElementById('adm-sku-cambpp').value.trim();
       const cont = document.getElementById('adm-resultado-cambpp');
-      const { data } = await buscarStockAvanzado({ sku: q, serie: q, paleta: q, descripcion: q, limit: 20 });
+      const { data } = await buscarStockAvanzado({ textoLibre: q, limit: 20 });
       if (!data?.length) { cont.innerHTML = '<p class="msg-error">No encontrado.</p>'; return; }
       cont.innerHTML = data.map(r => `
         <div class="card" style="margin-bottom:8px;">

@@ -11,24 +11,24 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // FUNCIONES DE ACCESO A DATOS - STOCK
 // ============================================================
 
-async function buscarStockAvanzado({ sku = '', serie = '', ubic = '', paleta = '', cliente = '', estado = '', descripcion = '', orden = 'id', dir = 'asc', limit = 200 } = {}) {
+async function buscarStockAvanzado({ sku = '', serie = '', ubic = '', paleta = '', cliente = '', estado = '', descripcion = '', textoLibre = '', orden = 'id', dir = 'asc', limit = 200 } = {}) {
   let query = sb.from('stock').select('*');
-
-  if (sku) query = query.ilike('sku', `%${sku.trim()}%`);
-  if (serie) query = query.ilike('serie', `%${serie.trim()}%`);
-  if (ubic) query = query.ilike('ubicacion_fisica', `%${ubic.trim()}%`);
-  if (paleta) query = query.ilike('paleta_pedido', `%${paleta.trim()}%`);
-  if (cliente) query = query.eq('cliente', cliente);
-  if (estado) query = query.eq('estado', estado);
-  if (descripcion) query = query.ilike('descripcion', `%${descripcion.trim()}%`);
-
-  query = query.order(orden, { ascending: dir === 'asc' }).limit(limit);
-
-  const { data, error } = await query;
-  if (error) {
-    console.error('Error buscarStockAvanzado:', error);
-    return { data: [], error };
+  // Filtros individuales (AND entre si)
+  if (sku)         query = query.ilike('sku',             '%' + sku.trim() + '%');
+  if (serie)       query = query.ilike('serie',           '%' + serie.trim() + '%');
+  if (ubic)        query = query.ilike('ubicacion_fisica','%' + ubic.trim() + '%');
+  if (paleta)      query = query.ilike('paleta_pedido',   '%' + paleta.trim() + '%');
+  if (descripcion) query = query.ilike('descripcion',     '%' + descripcion.trim() + '%');
+  if (cliente)     query = query.eq('cliente', cliente);
+  if (estado)      query = query.eq('estado',  estado);
+  // Busqueda libre: OR en todos los campos de texto
+  if (textoLibre) {
+    const t = textoLibre.trim();
+    query = query.or('sku.ilike.%' + t + '%,serie.ilike.%' + t + '%,descripcion.ilike.%' + t + '%,paleta_pedido.ilike.%' + t + '%,ubicacion_fisica.ilike.%' + t + '%');
   }
+  query = query.order(orden, { ascending: dir === 'asc' }).limit(limit);
+  const { data, error } = await query;
+  if (error) { console.error('buscarStockAvanzado:', error); return { data: [], error }; }
   return { data, error: null };
 }
 
