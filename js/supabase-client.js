@@ -1088,27 +1088,23 @@ async function registrarIngresosDesdeExcel(filas) {
 // FUNCIONES — LPNs (Contenedores físicos de recepción)
 // ============================================================
 
-// Genera el siguiente código de LPN correlativo por cliente
-// Formato: C-ENT-001, C-CLA-002, C-TEL-001, C-GEN-001
-async function generarCodigoLPN(cliente) {
-  const prefMap = { ENTEL: 'ENT', CLARO: 'CLA', TELRAD: 'TEL' };
-  const pref = prefMap[String(cliente || '').toUpperCase()] || 'GEN';
-  const patron = `C-${pref}-%`;
-
+// Genera el siguiente código de LPN correlativo global
+// Formato: LPN00001, LPN00002, LPN00003...
+async function generarCodigoLPN() {
   const { data, error } = await sb
     .from('lpns')
     .select('codigo')
-    .ilike('codigo', patron)
+    .ilike('codigo', 'LPN%')
     .order('codigo', { ascending: false })
     .limit(1);
 
   let siguiente = 1;
   if (!error && data && data.length > 0) {
     const ultimo = data[0].codigo;
-    const num = parseInt(ultimo.split('-').pop(), 10);
+    const num = parseInt(ultimo.replace('LPN', ''), 10);
     if (!isNaN(num)) siguiente = num + 1;
   }
-  return `C-${pref}-${String(siguiente).padStart(3, '0')}`;
+  return `LPN${String(siguiente).padStart(5, '0')}`;
 }
 
 // Crea un LPN nuevo

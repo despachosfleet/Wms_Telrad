@@ -3,48 +3,100 @@
 //   A) LPN  — pistoleo directo al WMS, crea contenedor físico
 //   B) Excel — sube formato de 10 columnas ya validado
 //   C) Manual — formulario ítem por ítem
+// + Vista de LPNs creados con detalle e impresión de etiqueta
 // ============================================================
 
 const RecepcionView = {
   title: 'Recepción',
-  _flujo: null,       // 'lpn' | 'excel' | 'manual'
-  _preview: [],       // ítems leídos del Excel (flujo B)
-  _lpnActual: null,   // { id, codigo, cliente } (flujo A)
-  _itemsLPN: [],      // ítems pistoliados en el LPN activo
+  _flujo: null,         // 'lpn' | 'excel' | 'manual' | 'lista-lpns' | 'detalle-lpn'
+  _preview: [],         // ítems leídos del Excel (flujo B)
+  _lpnActual: null,     // { id, codigo, cliente } (flujo A)
+  _itemsLPN: [],        // ítems pistoleados en el LPN activo
+  _manualItems: [],     // ítems acumulados en flujo manual
+  _lpnModoEscaneo: false, // true = escaneando LPN impreso, false = automático
 
+  // ============================================================
+  // PRESERVACIÓN DE ESTADO (PC — pestañas)
+  // ============================================================
+  hasProgress() {
+    return (
+      (this._flujo === 'lpn'    && this._itemsLPN.length > 0) ||
+      (this._flujo === 'manual' && this._manualItems.length > 0) ||
+      (this._flujo === 'excel'  && this._preview.length > 0)
+    );
+  },
+
+  saveState() {
+    return {
+      flujo:        this._flujo,
+      preview:      this._preview,
+      lpnActual:    this._lpnActual,
+      itemsLPN:     this._itemsLPN,
+      manualItems:  this._manualItems,
+      lpnModoEscaneo: this._lpnModoEscaneo,
+    };
+  },
+
+  restoreState(s) {
+    this._flujo          = s.flujo;
+    this._preview        = s.preview        || [];
+    this._lpnActual      = s.lpnActual      || null;
+    this._itemsLPN       = s.itemsLPN       || [];
+    this._manualItems    = s.manualItems    || [];
+    this._lpnModoEscaneo = s.lpnModoEscaneo || false;
+
+    // Ejecutar afterRender para ligar eventos base
+    this.afterRender();
+
+    // Restaurar sub-flujo si había uno activo
+    if (this._flujo) {
+      const sel = document.getElementById('recep-selector');
+      if (sel) sel.style.display = 'none';
+      const c = document.getElementById('recep-contenido');
+      if (c) this._renderFlujo(c);
+    }
+  },
+
+  // ============================================================
+  // RENDER PRINCIPAL
+  // ============================================================
   render() {
     return `
-      <div class="page-inner">
-        <div id="recep-selector">
-          <div class="card" style="margin-bottom:0;">
-            <p class="card-title">Recepción de mercadería</p>
-            <p class="card-subtitle">Selecciona el flujo según tu situación</p>
-            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-top:8px;">
+      <div id="recep-selector">
+        <div class="card" style="margin-bottom:0;">
+          <p class="card-title">Recepción de mercadería</p>
+          <p class="card-subtitle">Selecciona el flujo según tu situación</p>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px;">
 
-              <button class="recep-opcion" data-flujo="lpn">
-                <div class="recep-op-icon">📦</div>
-                <div class="recep-op-titulo">Flujo LPN</div>
-                <div class="recep-op-desc">Pistoleas directo al sistema. Crea contenedor físico (LPN) con los ítems. Exporta Excel para Sharepoint.</div>
-              </button>
+            <button class="recep-opcion" data-flujo="lpn">
+              <div class="recep-op-icon">📦</div>
+              <div class="recep-op-titulo">Flujo LPN</div>
+              <div class="recep-op-desc">Pistoleas directo al sistema. Crea contenedor físico (LPN) con los ítems. Exporta Excel para Sharepoint.</div>
+            </button>
 
-              <button class="recep-opcion" data-flujo="excel">
-                <div class="recep-op-icon">📊</div>
-                <div class="recep-op-titulo">Flujo Excel</div>
-                <div class="recep-op-desc">Ya pistoleaste en tu Excel y lo subiste al Sharepoint. Subes ese mismo Excel aquí para registrar el stock.</div>
-              </button>
+            <button class="recep-opcion" data-flujo="excel">
+              <div class="recep-op-icon">📊</div>
+              <div class="recep-op-titulo">Flujo Excel</div>
+              <div class="recep-op-desc">Ya pistoleaste en tu Excel y lo subiste al Sharepoint. Subes ese mismo Excel aquí para registrar el stock.</div>
+            </button>
 
-              <button class="recep-opcion" data-flujo="manual">
-                <div class="recep-op-icon">✏️</div>
-                <div class="recep-op-titulo">Ingreso manual</div>
-                <div class="recep-op-desc">Para ingresos pequeños o casos puntuales. Ingresas ítem por ítem con el formulario.</div>
-              </button>
+            <button class="recep-opcion" data-flujo="manual">
+              <div class="recep-op-icon">✏️</div>
+              <div class="recep-op-titulo">Ingreso manual</div>
+              <div class="recep-op-desc">Para ingresos pequeños o casos puntuales. Ingresas ítem por ítem con el formulario.</div>
+            </button>
 
-            </div>
+            <button class="recep-opcion" data-flujo="lista-lpns">
+              <div class="recep-op-icon">🗂️</div>
+              <div class="recep-op-titulo">Ver LPNs</div>
+              <div class="recep-op-desc">Consulta todos los contenedores creados, su contenido y estado. Imprime etiquetas.</div>
+            </button>
+
           </div>
         </div>
-
-        <div id="recep-contenido"></div>
       </div>
+
+      <div id="recep-contenido"></div>
     `;
   },
 
@@ -53,30 +105,35 @@ const RecepcionView = {
       btn.addEventListener('click', () => {
         this._flujo = btn.dataset.flujo;
         document.getElementById('recep-selector').style.display = 'none';
-        this._renderFlujo();
+        const c = document.getElementById('recep-contenido');
+        this._renderFlujo(c);
       });
     });
   },
 
-  _renderFlujo() {
-    const c = document.getElementById('recep-contenido');
-    if (this._flujo === 'lpn')    this._renderLPN(c);
-    if (this._flujo === 'excel')  this._renderExcel(c);
-    if (this._flujo === 'manual') this._renderManual(c);
+  _renderFlujo(c) {
+    if (!c) c = document.getElementById('recep-contenido');
+    if (this._flujo === 'lpn')        this._renderLPN(c);
+    if (this._flujo === 'excel')      this._renderExcel(c);
+    if (this._flujo === 'manual')     this._renderManual(c);
+    if (this._flujo === 'lista-lpns') this._renderListaLPNs(c);
+    if (this._flujo === 'detalle-lpn') { /* se maneja con params */ }
   },
 
-  _btnVolver(contenedor) {
+  _btnVolver() {
     return `<button class="btn-secondary" id="btn-volver-recep" style="margin-bottom:12px;">← Volver</button>`;
   },
 
   _bindVolver(contenedor) {
     document.getElementById('btn-volver-recep')?.addEventListener('click', () => {
-      this._flujo = null;
-      this._lpnActual = null;
-      this._itemsLPN = [];
-      this._preview = [];
-      contenedor.innerHTML = '';
-      document.getElementById('recep-selector').style.display = '';
+      this._flujo       = null;
+      this._lpnActual   = null;
+      this._itemsLPN    = [];
+      this._preview     = [];
+      this._manualItems = [];
+      if (contenedor) contenedor.innerHTML = '';
+      const sel = document.getElementById('recep-selector');
+      if (sel) sel.style.display = '';
     });
   },
 
@@ -85,9 +142,27 @@ const RecepcionView = {
   // ============================================================
   _renderLPN(c) {
     c.innerHTML = `
-      ${this._btnVolver(c)}
-      <div class="card" id="lpn-setup-card">
-        <p class="card-title">Flujo LPN — Nuevo contenedor</p>
+      ${this._btnVolver()}
+      <div class="card" id="lpn-modo-card">
+        <p class="card-title">Flujo LPN — ¿Cómo quieres identificar el contenedor?</p>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px;">
+
+          <button class="recep-opcion" id="btn-modo-auto">
+            <div class="recep-op-icon">⚡</div>
+            <div class="recep-op-titulo">LPN automático</div>
+            <div class="recep-op-desc">El sistema genera el código (LPN00001). Lo ves en pantalla y lo escribes con plumón en la caja si quieres.</div>
+          </button>
+
+          <button class="recep-opcion" id="btn-modo-impreso">
+            <div class="recep-op-icon">🏷️</div>
+            <div class="recep-op-titulo">LPN impreso</div>
+            <div class="recep-op-desc">Ya tienes etiquetas impresas. Escaneas el código de barras de la etiqueta para asociarla al contenedor.</div>
+          </button>
+
+        </div>
+      </div>
+      <div class="card" id="lpn-setup-card" style="display:none;">
+        <p class="card-title" id="lpn-setup-titulo">Nuevo LPN</p>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
           <div class="field">
             <label>Cliente</label>
@@ -99,9 +174,14 @@ const RecepcionView = {
               <option value="AMERICATEL">AMERICATEL</option>
             </select>
           </div>
-          <div class="field">
-            <label>N° Guía (opcional)</label>
-            <input type="text" id="lpn-nguia" placeholder="T028-000001">
+          <div class="field" id="lpn-codigo-manual-wrap" style="display:none;">
+            <label>Escanear código LPN impreso</label>
+            <div style="display:flex; gap:6px;">
+              <input type="text" id="lpn-codigo-manual" placeholder="Escanea o escribe el código" style="font-family:monospace; flex:1;">
+              <button class="btn-icon btn-scan" id="btn-scan-lpn-codigo" title="Escanear con cámara">
+                <svg viewBox="0 0 24 24" width="20" height="20"><rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/><rect x="3" y="16" width="5" height="5"/><path d="M21 16h-3v3M21 21h-3M16 16h.01M16 21h-2v-2M8 21H3v-3M8 12H3v-4M21 12V8h-5M12 3v5M12 12v1M12 16v5"/></svg>
+              </button>
+            </div>
           </div>
         </div>
         <button class="btn-primary" id="btn-crear-lpn">Crear LPN y empezar</button>
@@ -109,18 +189,58 @@ const RecepcionView = {
       <div id="lpn-trabajo"></div>
     `;
     this._bindVolver(c);
+
+    document.getElementById('btn-modo-auto')?.addEventListener('click', () => {
+      this._lpnModoEscaneo = false;
+      document.getElementById('lpn-modo-card').style.display = 'none';
+      document.getElementById('lpn-setup-card').style.display = '';
+      document.getElementById('lpn-setup-titulo').textContent = 'Nuevo LPN — automático';
+      document.getElementById('lpn-codigo-manual-wrap').style.display = 'none';
+    });
+
+    document.getElementById('btn-modo-impreso')?.addEventListener('click', () => {
+      this._lpnModoEscaneo = true;
+      document.getElementById('lpn-modo-card').style.display = 'none';
+      document.getElementById('lpn-setup-card').style.display = '';
+      document.getElementById('lpn-setup-titulo').textContent = 'Nuevo LPN — escanear etiqueta impresa';
+      document.getElementById('lpn-codigo-manual-wrap').style.display = '';
+    });
+
+    document.getElementById('btn-scan-lpn-codigo')?.addEventListener('click', () => {
+      abrirEscaner('lpn-setup-card', (texto) => {
+        const inp = document.getElementById('lpn-codigo-manual');
+        if (inp) { inp.value = texto; inp.focus(); }
+      }, (err) => alert('Error cámara: ' + err));
+    });
+
     document.getElementById('btn-crear-lpn')?.addEventListener('click', () => this._crearLPN());
+
+    // Si hay LPN activo (restaurando estado), mostrar trabajo directamente
+    if (this._lpnActual) {
+      document.getElementById('lpn-modo-card').style.display = 'none';
+      document.getElementById('lpn-setup-card').style.display = 'none';
+      this._renderLPNTrabajo(document.getElementById('lpn-trabajo'));
+    }
   },
 
   async _crearLPN() {
     const cliente = document.getElementById('lpn-cliente')?.value || '';
-    const nguia   = document.getElementById('lpn-nguia')?.value?.trim() || '';
     const btn     = document.getElementById('btn-crear-lpn');
     if (btn) { btn.disabled = true; btn.textContent = 'Creando…'; }
 
-    const codigo = await generarCodigoLPN(cliente);
-    const { data, error } = await crearLPN({ codigo, cliente, n_guia: nguia });
+    let codigo;
+    if (this._lpnModoEscaneo) {
+      codigo = document.getElementById('lpn-codigo-manual')?.value?.trim().toUpperCase();
+      if (!codigo) {
+        alert('Escanea o escribe el código del LPN impreso.');
+        if (btn) { btn.disabled = false; btn.textContent = 'Crear LPN y empezar'; }
+        return;
+      }
+    } else {
+      codigo = await generarCodigoLPN();
+    }
 
+    const { data, error } = await crearLPN({ codigo, cliente });
     if (error || !data) {
       if (btn) { btn.disabled = false; btn.textContent = 'Crear LPN y empezar'; }
       alert('Error al crear LPN: ' + (error?.message || error));
@@ -139,7 +259,7 @@ const RecepcionView = {
       <div class="card" style="border-left:3px solid var(--accent); margin-bottom:10px;">
         <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
           <div>
-            <span style="font-size:18px; font-weight:900; color:var(--accent); font-family:monospace;">${escapeHtml(lp.codigo)}</span>
+            <span style="font-size:20px; font-weight:900; color:var(--accent); font-family:monospace; letter-spacing:1px;">${escapeHtml(lp.codigo)}</span>
             <span class="pill pill-warning" style="margin-left:8px;">EN RECEPCIÓN</span>
           </div>
           <div style="font-size:12px; color:var(--text-secondary);">
@@ -147,7 +267,7 @@ const RecepcionView = {
           </div>
         </div>
         <p style="font-size:11px; color:var(--text-tertiary); margin-top:4px;">
-          Escribe este código con plumón en la caja/paleta física.
+          Escribe <strong>${escapeHtml(lp.codigo)}</strong> con plumón en la caja/paleta física si no tienes etiqueta.
         </p>
       </div>
 
@@ -157,11 +277,21 @@ const RecepcionView = {
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
           <div class="field">
             <label>SKU / Material</label>
-            <input type="text" id="lpn-sku" placeholder="ENT960051374" style="font-family:monospace;">
+            <div style="display:flex; gap:6px;">
+              <input type="text" id="lpn-sku" style="font-family:monospace; flex:1;">
+              <button class="btn-icon btn-scan" id="btn-scan-sku" title="Escanear SKU">
+                <svg viewBox="0 0 24 24" width="18" height="18"><rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/><rect x="3" y="16" width="5" height="5"/><path d="M21 16h-3v3M21 21h-3M16 16h.01M16 21h-2v-2M8 21H3v-3M8 12H3v-4M21 12V8h-5M12 3v5M12 12v1M12 16v5"/></svg>
+              </button>
+            </div>
           </div>
           <div class="field">
-            <label>Serie (pistoleable)</label>
-            <input type="text" id="lpn-serie" placeholder="Pistola o escribe la serie" style="font-family:monospace;">
+            <label>Serie</label>
+            <div style="display:flex; gap:6px;">
+              <input type="text" id="lpn-serie" style="font-family:monospace; flex:1;">
+              <button class="btn-icon btn-scan" id="btn-scan-serie" title="Escanear serie">
+                <svg viewBox="0 0 24 24" width="18" height="18"><rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/><rect x="3" y="16" width="5" height="5"/><path d="M21 16h-3v3M21 21h-3M16 16h.01M16 21h-2v-2M8 21H3v-3M8 12H3v-4M21 12V8h-5M12 3v5M12 12v1M12 16v5"/></svg>
+              </button>
+            </div>
           </div>
           <div class="field">
             <label>Cantidad</label>
@@ -169,7 +299,7 @@ const RecepcionView = {
           </div>
           <div class="field">
             <label>N° Pedido del cliente</label>
-            <input type="text" id="lpn-pedido" placeholder="MR-218, 4400669533...">
+            <input type="text" id="lpn-pedido">
           </div>
           <div class="field">
             <label>Tipo ingreso</label>
@@ -183,10 +313,10 @@ const RecepcionView = {
           </div>
           <div class="field">
             <label>Observaciones</label>
-            <input type="text" id="lpn-obs" placeholder="Opcional">
+            <input type="text" id="lpn-obs">
           </div>
         </div>
-        <div style="display:flex; gap:8px;">
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
           <button class="btn-primary" id="btn-agregar-item-lpn">+ Agregar ítem</button>
           <button class="btn-secondary" id="btn-buscar-sku-lpn">Buscar descripción</button>
         </div>
@@ -210,7 +340,7 @@ const RecepcionView = {
       <div class="card" style="background:var(--accent-dim); border-color:var(--accent);">
         <p class="card-title">¿Terminaste este contenedor?</p>
         <p style="font-size:12px; color:var(--text-secondary); margin-bottom:10px;">
-          Al cerrar, los ítems quedan en stock con estado DISPONIBLE en zona RECEPCIÓN. 
+          Al cerrar, los ítems quedan en stock con estado DISPONIBLE en zona RECEPCIÓN.
           Puedes crear otro LPN para más mercadería o finalizar.
         </p>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -227,6 +357,21 @@ const RecepcionView = {
   },
 
   _bindLPNEventos(contenedor) {
+    // Scanners de cámara
+    document.getElementById('btn-scan-sku')?.addEventListener('click', () => {
+      abrirEscaner('lpn-trabajo', (txt) => {
+        const inp = document.getElementById('lpn-sku');
+        if (inp) { inp.value = txt.toUpperCase(); this._buscarDescripcionSKU(txt); }
+      }, err => alert('Error cámara: ' + err));
+    });
+
+    document.getElementById('btn-scan-serie')?.addEventListener('click', () => {
+      abrirEscaner('lpn-trabajo', (txt) => {
+        const inp = document.getElementById('lpn-serie');
+        if (inp) { inp.value = txt; document.getElementById('lpn-cantidad')?.focus(); }
+      }, err => alert('Error cámara: ' + err));
+    });
+
     // Enter en campos para pistolaje rápido
     ['lpn-sku','lpn-serie','lpn-cantidad','lpn-pedido'].forEach(id => {
       document.getElementById(id)?.addEventListener('keydown', e => {
@@ -234,17 +379,15 @@ const RecepcionView = {
       });
     });
 
-    document.getElementById('btn-buscar-sku-lpn')?.addEventListener('click', async () => {
+    // Auto-buscar descripción al salir del campo SKU
+    document.getElementById('lpn-sku')?.addEventListener('blur', () => {
       const sku = document.getElementById('lpn-sku')?.value?.trim();
-      if (!sku) return;
-      const info = document.getElementById('lpn-sku-info');
-      info.textContent = 'Buscando…';
-      const art = await buscarEnMaestro(sku);
-      if (art) {
-        info.innerHTML = `<span style="color:var(--success);">✓ ${escapeHtml(art.descripcion)}</span>`;
-      } else {
-        info.innerHTML = `<span style="color:var(--warning);">SKU no encontrado en maestro — puedes cargarlo igual.</span>`;
-      }
+      if (sku) this._buscarDescripcionSKU(sku);
+    });
+
+    document.getElementById('btn-buscar-sku-lpn')?.addEventListener('click', () => {
+      const sku = document.getElementById('lpn-sku')?.value?.trim();
+      if (sku) this._buscarDescripcionSKU(sku);
     });
 
     document.getElementById('btn-agregar-item-lpn')?.addEventListener('click', () => {
@@ -254,37 +397,52 @@ const RecepcionView = {
       const pedido   = document.getElementById('lpn-pedido')?.value?.trim();
       const tipo     = document.getElementById('lpn-tipo')?.value || 'NUEVO';
       const obs      = document.getElementById('lpn-obs')?.value?.trim();
+      const desc     = document.getElementById('lpn-sku-info')?.dataset?.desc || '';
 
       if (!sku) { alert('El SKU / Material es obligatorio.'); return; }
 
       this._itemsLPN.push({
         MATERIAL: sku,
-        DESCRIPCION: document.getElementById('lpn-sku-info')?.textContent?.replace('✓ ','') || '',
+        DESCRIPCION: desc,
         SERIE: serie || '-',
         CANTIDAD_RECIBIDA: cantidad,
         N_PEDIDO: pedido || '',
         CLIENTE: this._lpnActual.cliente || '',
-        N_GUIA: this._lpnActual.n_guia || '',
         TIPO_INGRESO: tipo,
         OBSERVACIONES: obs || '',
         FECHA: new Date().toLocaleDateString('es-PE')
       });
 
-      // Limpiar campos rápido para siguiente pistolaje
-      document.getElementById('lpn-sku').value = '';
-      document.getElementById('lpn-serie').value = '';
+      // Limpiar para siguiente pistolaje
+      document.getElementById('lpn-sku').value     = '';
+      document.getElementById('lpn-serie').value   = '';
       document.getElementById('lpn-cantidad').value = '1';
-      document.getElementById('lpn-sku-info').textContent = '';
+      const info = document.getElementById('lpn-sku-info');
+      if (info) { info.textContent = ''; info.dataset.desc = ''; }
       document.getElementById('lpn-sku')?.focus();
 
       this._renderItemsLPN();
     });
 
-    document.getElementById('btn-cerrar-lpn')?.addEventListener('click', () => this._cerrarLPN());
-    document.getElementById('btn-nuevo-lpn-mas')?.addEventListener('click', () => this._nuevoLPNMas(contenedor));
-    document.getElementById('btn-exportar-lpn')?.addEventListener('click', () => {
+    document.getElementById('btn-cerrar-lpn')?.addEventListener('click',     () => this._cerrarLPN());
+    document.getElementById('btn-nuevo-lpn-mas')?.addEventListener('click',  () => this._nuevoLPNMas());
+    document.getElementById('btn-exportar-lpn')?.addEventListener('click',   () => {
       exportarRecepcionAExcel(this._itemsLPN, `recepcion_${this._lpnActual.codigo}.xlsx`);
     });
+  },
+
+  async _buscarDescripcionSKU(sku) {
+    const info = document.getElementById('lpn-sku-info');
+    if (!info || !sku) return;
+    info.textContent = 'Buscando…';
+    const art = await buscarEnMaestro(sku);
+    if (art) {
+      info.innerHTML = `<span style="color:var(--success);">✓ ${escapeHtml(art.descripcion)}</span>`;
+      info.dataset.desc = art.descripcion || '';
+    } else {
+      info.innerHTML = `<span style="color:var(--warning);">SKU no encontrado en maestro — puedes cargarlo igual.</span>`;
+      info.dataset.desc = '';
+    }
   },
 
   _renderItemsLPN() {
@@ -313,7 +471,7 @@ const RecepcionView = {
                 <td style="color:var(--text-tertiary);">${i+1}</td>
                 <td class="sku-cell">${escapeHtml(it.MATERIAL)}</td>
                 <td class="serie-cell" style="font-size:10px;">
-                  ${it.SERIE && !it.SERIE.startsWith('-') ? escapeHtml(it.SERIE) : '<span style="color:var(--text-tertiary);">Sin serie</span>'}
+                  ${it.SERIE && it.SERIE !== '-' ? escapeHtml(it.SERIE) : '<span style="color:var(--text-tertiary);">Sin serie</span>'}
                 </td>
                 <td style="font-weight:700; color:var(--accent);">${formatNum(it.CANTIDAD_RECIBIDA)}</td>
                 <td style="font-size:11px;">${escapeHtml(it.N_PEDIDO) || '—'}</td>
@@ -355,7 +513,8 @@ const RecepcionView = {
     }
 
     if (btn) btn.style.display = 'none';
-    document.getElementById('btn-exportar-lpn').style.display = '';
+    const btnExportar = document.getElementById('btn-exportar-lpn');
+    if (btnExportar) btnExportar.style.display = '';
     if (res) res.innerHTML = `
       <div class="alert alert-success">
         <strong>✓ LPN ${escapeHtml(this._lpnActual.codigo)} cerrado — ${count} ítems en stock (zona RECEPCIÓN).</strong><br>
@@ -364,14 +523,11 @@ const RecepcionView = {
     `;
   },
 
-  async _nuevoLPNMas(contenedor) {
-    // Guarda los ítems del LPN actual y crea uno nuevo del mismo cliente
-    this._itemsLPN = [];
+  _nuevoLPNMas() {
+    this._itemsLPN  = [];
     this._lpnActual = null;
-    document.getElementById('lpn-setup-card').style.display = '';
-    document.getElementById('lpn-trabajo').innerHTML = '';
-    const btn = document.getElementById('btn-crear-lpn');
-    if (btn) { btn.disabled = false; btn.textContent = 'Crear LPN y empezar'; }
+    const c = document.getElementById('recep-contenido');
+    if (c) this._renderLPN(c);
   },
 
   // ============================================================
@@ -379,11 +535,11 @@ const RecepcionView = {
   // ============================================================
   _renderExcel(c) {
     c.innerHTML = `
-      ${this._btnVolver(c)}
+      ${this._btnVolver()}
       <div class="card">
         <p class="card-title">Flujo Excel — Subir ingresos</p>
         <p class="card-subtitle">
-          El archivo debe tener <strong>10 columnas en este orden exacto</strong>. 
+          El archivo debe tener <strong>10 columnas en este orden exacto</strong>.
           Los encabezados no importan — el sistema lee por posición de columna.
         </p>
         <div class="table-wrap" style="margin-bottom:14px;">
@@ -393,7 +549,7 @@ const RecepcionView = {
               ${[
                 ['1','FECHA','Fecha de ingreso','05/05/2026'],
                 ['2','CLIENTE','ENTEL, CLARO o TELRAD','ENTEL'],
-                ['3','N_PEDIDO','Número de pedido (cualquier formato)','MR-218'],
+                ['3','N_PEDIDO','Número de pedido','MR-218'],
                 ['4','MATERIAL','Código SKU del artículo','ENT960051374'],
                 ['5','DESCRIPCION','Descripción del artículo','HUAWEI 25030432...'],
                 ['6','SERIE','Serie del artículo (o "-" si no tiene)','024QLM10R8103263'],
@@ -427,7 +583,7 @@ const RecepcionView = {
     const drop  = document.getElementById('file-drop-recep');
     const input = document.getElementById('input-recep');
     drop.addEventListener('click', () => input.click());
-    drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag-over'); });
+    drop.addEventListener('dragover',  e => { e.preventDefault(); drop.classList.add('drag-over'); });
     drop.addEventListener('dragleave', () => drop.classList.remove('drag-over'));
     drop.addEventListener('drop', e => {
       e.preventDefault(); drop.classList.remove('drag-over');
@@ -455,11 +611,11 @@ const RecepcionView = {
         preview.innerHTML = '<div class="alert alert-danger">El Excel está vacío.</div>';
         return;
       }
-      // Detectar fila de encabezado
-      const primeraFila = filas[0];
-      const COLS = ['FECHA','CLIENTE','N_PEDIDO','MATERIAL','DESCRIPCION','SERIE','CANTIDAD','N_GUIA','TIPO','OBS'];
-      const matchCount = COLS.filter(c => primeraFila.some(v => String(v).toUpperCase().includes(c.substring(0,4)))).length;
-      const filaInicio = matchCount >= 3 ? 1 : 0;
+
+      const primeraFila  = filas[0];
+      const COLS         = ['FECHA','CLIENTE','N_PEDIDO','MATERIAL','DESCRIPCION','SERIE','CANTIDAD','N_GUIA','TIPO','OBS'];
+      const matchCount   = COLS.filter(c => primeraFila.some(v => String(v).toUpperCase().includes(c.substring(0,4)))).length;
+      const filaInicio   = matchCount >= 3 ? 1 : 0;
 
       this._preview = filas.slice(filaInicio)
         .filter(r => r.some(v => v !== '' && v !== null))
@@ -478,7 +634,7 @@ const RecepcionView = {
         .filter(r => r.MATERIAL && r.CANTIDAD_RECIBIDA > 0);
 
       if (!this._preview.length) {
-        preview.innerHTML = '<div class="alert alert-danger">No se encontraron filas válidas. Verifica que MATERIAL esté en columna 4 y CANTIDAD_RECIBIDA en columna 7 con valor mayor a 0.</div>';
+        preview.innerHTML = '<div class="alert alert-danger">No se encontraron filas válidas.</div>';
         return;
       }
       this._renderPreviewExcel(preview);
@@ -530,7 +686,7 @@ const RecepcionView = {
       </div>
     `;
 
-    document.getElementById('btn-cargar-excel-recep')?.addEventListener('click', () => this._cargarExcel(preview));
+    document.getElementById('btn-cargar-excel-recep')?.addEventListener('click',   () => this._cargarExcel(preview));
     document.getElementById('btn-cancelar-excel-recep')?.addEventListener('click', () => {
       preview.innerHTML = '';
       this._preview = [];
@@ -544,6 +700,7 @@ const RecepcionView = {
     const { error, count } = await registrarIngresosDesdeExcel(this._preview);
     const res = document.getElementById('resultado-recep');
     preview.innerHTML = '';
+    this._preview = [];
 
     if (error) {
       if (res) res.innerHTML = `<div class="alert alert-danger">Error: ${escapeHtml(String(error))}</div>`;
@@ -555,7 +712,7 @@ const RecepcionView = {
       </div>
       <div class="btn-row" style="margin-top:8px;">
         <button class="btn-secondary" onclick="Router.navigate('recepcion')">Cargar otro Excel</button>
-        <button class="btn-primary" onclick="Router.navigate('consulta')">Ver en consultas →</button>
+        <button class="btn-primary"   onclick="Router.navigate('consulta')">Ver en consultas →</button>
       </div>
     `;
   },
@@ -563,12 +720,10 @@ const RecepcionView = {
   // ============================================================
   // FLUJO C — Manual
   // ============================================================
-  _manualItems: [],
-
   _renderManual(c) {
-    this._manualItems = [];
+    if (!this._manualItems) this._manualItems = [];
     c.innerHTML = `
-      ${this._btnVolver(c)}
+      ${this._btnVolver()}
       <div class="card" style="margin-bottom:10px;">
         <p class="card-title">Ingreso manual — Agregar ítem</p>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
@@ -588,23 +743,33 @@ const RecepcionView = {
           </div>
           <div class="field">
             <label>N° Pedido</label>
-            <input type="text" id="man-pedido" placeholder="MR-218, 4400669533...">
+            <input type="text" id="man-pedido">
           </div>
           <div class="field">
             <label>N° Guía</label>
-            <input type="text" id="man-nguia" placeholder="T028-000001">
+            <input type="text" id="man-nguia">
           </div>
           <div class="field">
             <label>SKU / Material *</label>
-            <input type="text" id="man-sku" placeholder="ENT960051374" style="font-family:monospace;">
+            <div style="display:flex; gap:6px;">
+              <input type="text" id="man-sku" style="font-family:monospace; flex:1;">
+              <button class="btn-icon btn-scan" id="btn-scan-man-sku" title="Escanear">
+                <svg viewBox="0 0 24 24" width="18" height="18"><rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/><rect x="3" y="16" width="5" height="5"/><path d="M21 16h-3v3M21 21h-3M16 16h.01M16 21h-2v-2M8 21H3v-3M8 12H3v-4M21 12V8h-5M12 3v5M12 12v1M12 16v5"/></svg>
+              </button>
+            </div>
           </div>
           <div class="field">
             <label>Descripción</label>
-            <input type="text" id="man-desc" placeholder="Se completa automático si está en maestro">
+            <input type="text" id="man-desc">
           </div>
           <div class="field">
             <label>Serie</label>
-            <input type="text" id="man-serie" placeholder="Dejar vacío si no tiene" style="font-family:monospace;">
+            <div style="display:flex; gap:6px;">
+              <input type="text" id="man-serie" style="font-family:monospace; flex:1;">
+              <button class="btn-icon btn-scan" id="btn-scan-man-serie" title="Escanear">
+                <svg viewBox="0 0 24 24" width="18" height="18"><rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/><rect x="3" y="16" width="5" height="5"/><path d="M21 16h-3v3M21 21h-3M16 16h.01M16 21h-2v-2M8 21H3v-3M8 12H3v-4M21 12V8h-5M12 3v5M12 12v1M12 16v5"/></svg>
+              </button>
+            </div>
           </div>
           <div class="field">
             <label>Cantidad recibida *</label>
@@ -622,11 +787,11 @@ const RecepcionView = {
           </div>
           <div class="field">
             <label>Observaciones</label>
-            <input type="text" id="man-obs" placeholder="Opcional">
+            <input type="text" id="man-obs">
           </div>
         </div>
         <div style="display:flex; gap:8px;">
-          <button class="btn-primary" id="btn-agregar-manual">+ Agregar a la lista</button>
+          <button class="btn-primary"   id="btn-agregar-manual">+ Agregar a la lista</button>
           <button class="btn-secondary" id="btn-buscar-sku-manual">Buscar en maestro</button>
         </div>
         <div id="man-sku-info" style="margin-top:6px; font-size:11px; color:var(--text-secondary);"></div>
@@ -642,26 +807,36 @@ const RecepcionView = {
           </div>
         </div>
       </div>
-
       <div id="man-resultado"></div>
     `;
     this._bindVolver(c);
     this._bindManualEventos();
+    this._renderManualItems();
   },
 
   _bindManualEventos() {
-    document.getElementById('btn-buscar-sku-manual')?.addEventListener('click', async () => {
-      const sku  = document.getElementById('man-sku')?.value?.trim();
-      const info = document.getElementById('man-sku-info');
-      if (!sku) return;
-      info.textContent = 'Buscando…';
-      const art = await buscarEnMaestro(sku);
-      if (art) {
-        document.getElementById('man-desc').value = art.descripcion || '';
-        info.innerHTML = `<span style="color:var(--success);">✓ Descripción completada desde maestro</span>`;
-      } else {
-        info.innerHTML = `<span style="color:var(--warning);">SKU no encontrado en maestro</span>`;
-      }
+    document.getElementById('btn-scan-man-sku')?.addEventListener('click', () => {
+      abrirEscaner('recep-contenido', (txt) => {
+        const inp = document.getElementById('man-sku');
+        if (inp) { inp.value = txt.toUpperCase(); this._buscarDescManual(txt); }
+      }, err => alert('Error cámara: ' + err));
+    });
+
+    document.getElementById('btn-scan-man-serie')?.addEventListener('click', () => {
+      abrirEscaner('recep-contenido', (txt) => {
+        const inp = document.getElementById('man-serie');
+        if (inp) { inp.value = txt; document.getElementById('man-cantidad')?.focus(); }
+      }, err => alert('Error cámara: ' + err));
+    });
+
+    document.getElementById('btn-buscar-sku-manual')?.addEventListener('click', () => {
+      const sku = document.getElementById('man-sku')?.value?.trim();
+      if (sku) this._buscarDescManual(sku);
+    });
+
+    document.getElementById('man-sku')?.addEventListener('blur', () => {
+      const sku = document.getElementById('man-sku')?.value?.trim();
+      if (sku) this._buscarDescManual(sku);
     });
 
     document.getElementById('btn-agregar-manual')?.addEventListener('click', () => {
@@ -683,17 +858,29 @@ const RecepcionView = {
         OBSERVACIONES:     document.getElementById('man-obs')?.value?.trim() || '',
       });
 
-      // Limpiar para siguiente ítem
-      document.getElementById('man-sku').value     = '';
-      document.getElementById('man-serie').value   = '';
-      document.getElementById('man-desc').value    = '';
+      document.getElementById('man-sku').value      = '';
+      document.getElementById('man-serie').value    = '';
+      document.getElementById('man-desc').value     = '';
       document.getElementById('man-cantidad').value = '1';
-      document.getElementById('man-obs').value     = '';
+      document.getElementById('man-obs').value      = '';
       document.getElementById('man-sku-info').textContent = '';
       document.getElementById('man-sku')?.focus();
 
       this._renderManualItems();
     });
+  },
+
+  async _buscarDescManual(sku) {
+    const info = document.getElementById('man-sku-info');
+    if (!info) return;
+    info.textContent = 'Buscando…';
+    const art = await buscarEnMaestro(sku);
+    if (art) {
+      document.getElementById('man-desc').value = art.descripcion || '';
+      info.innerHTML = `<span style="color:var(--success);">✓ Descripción completada desde maestro</span>`;
+    } else {
+      info.innerHTML = `<span style="color:var(--warning);">SKU no encontrado en maestro</span>`;
+    }
   },
 
   _renderManualItems() {
@@ -707,18 +894,11 @@ const RecepcionView = {
     }
 
     if (!lista) return;
-
-    const btnGuardar = this._manualItems.length > 0 ? `
-      <div class="btn-row" style="margin-top:10px;">
-        <button class="btn-primary" id="btn-guardar-manual">✓ Guardar ${this._manualItems.length} ítems al stock</button>
-      </div>
-    ` : '';
-
     lista.innerHTML = `
       <div class="table-wrap" style="margin-bottom:8px;">
         <table class="data-table">
           <thead><tr>
-            <th>#</th><th>SKU</th><th>Descripción</th><th>Serie</th>
+            <th>#</th><th>SKU</th><th>Serie</th>
             <th>Cant.</th><th>Pedido</th><th>Tipo</th><th></th>
           </tr></thead>
           <tbody>
@@ -726,9 +906,8 @@ const RecepcionView = {
               <tr>
                 <td style="color:var(--text-tertiary);">${i+1}</td>
                 <td class="sku-cell">${escapeHtml(it.MATERIAL)}</td>
-                <td style="font-size:10px; max-width:220px;">${escapeHtml(it.DESCRIPCION) || '—'}</td>
                 <td class="serie-cell" style="font-size:10px;">
-                  ${it.SERIE && !it.SERIE.startsWith('-') ? escapeHtml(it.SERIE) : '<span style="color:var(--text-tertiary);">Sin serie</span>'}
+                  ${it.SERIE && it.SERIE !== '-' ? escapeHtml(it.SERIE) : '<span style="color:var(--text-tertiary);">Sin serie</span>'}
                 </td>
                 <td style="font-weight:700;color:var(--accent);">${formatNum(it.CANTIDAD_RECIBIDA)}</td>
                 <td style="font-size:11px;">${escapeHtml(it.N_PEDIDO) || '—'}</td>
@@ -743,7 +922,9 @@ const RecepcionView = {
           </tbody>
         </table>
       </div>
-      ${btnGuardar}
+      <div class="btn-row" style="margin-top:10px;">
+        <button class="btn-primary" id="btn-guardar-manual">✓ Guardar ${this._manualItems.length} ítems al stock</button>
+      </div>
     `;
 
     document.getElementById('btn-guardar-manual')?.addEventListener('click', () => this._guardarManual());
@@ -775,9 +956,257 @@ const RecepcionView = {
       </div>
       <div class="btn-row" style="margin-top:8px;">
         <button class="btn-secondary" onclick="Router.navigate('recepcion')">Nueva recepción</button>
-        <button class="btn-primary" onclick="Router.navigate('consulta')">Ver en consultas →</button>
+        <button class="btn-primary"   onclick="Router.navigate('consulta')">Ver en consultas →</button>
       </div>
     `;
+  },
+
+  // ============================================================
+  // VISTA DE LPNs — listado y detalle
+  // ============================================================
+  async _renderListaLPNs(c) {
+    c.innerHTML = `
+      ${this._btnVolver()}
+      <div class="card" style="margin-bottom:10px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+          <p class="card-title" style="margin:0;">Contenedores LPN</p>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <select id="lpn-filtro-estado" style="font-size:12px;">
+              <option value="">Todos los estados</option>
+              <option value="RECEPCION">En recepción</option>
+              <option value="UBICADO">Ubicados</option>
+            </select>
+            <select id="lpn-filtro-cliente" style="font-size:12px;">
+              <option value="">Todos los clientes</option>
+              <option value="ENTEL">ENTEL</option>
+              <option value="CLARO">CLARO</option>
+              <option value="TELRAD">TELRAD</option>
+            </select>
+          </div>
+        </div>
+        <div id="lpn-lista-contenido">
+          <div class="empty-state"><div class="empty-icon">⏳</div>Cargando LPNs…</div>
+        </div>
+      </div>
+    `;
+    this._bindVolver(c);
+
+    document.getElementById('lpn-filtro-estado')?.addEventListener('change',  () => this._cargarLPNs());
+    document.getElementById('lpn-filtro-cliente')?.addEventListener('change', () => this._cargarLPNs());
+
+    await this._cargarLPNs();
+  },
+
+  async _cargarLPNs() {
+    const estado  = document.getElementById('lpn-filtro-estado')?.value  || null;
+    const cliente = document.getElementById('lpn-filtro-cliente')?.value || null;
+    const lista   = document.getElementById('lpn-lista-contenido');
+    if (!lista) return;
+
+    lista.innerHTML = '<div class="empty-state"><div class="empty-icon">⏳</div>Cargando…</div>';
+    const lpns = await obtenerLPNs({ estado, cliente });
+
+    if (!lpns.length) {
+      lista.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div>No hay LPNs creados aún.</div>';
+      return;
+    }
+
+    lista.innerHTML = `
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr>
+            <th>Código</th><th>Cliente</th><th>Ítems</th><th>Estado</th><th>Ubicación</th><th>Fecha</th><th></th>
+          </tr></thead>
+          <tbody>
+            ${lpns.map(lp => {
+              const itemCount = lp.stock?.[0]?.count ?? '?';
+              const estadoPill = lp.estado === 'UBICADO'
+                ? `<span class="pill pill-success">Ubicado</span>`
+                : `<span class="pill pill-warning">En recepción</span>`;
+              return `
+                <tr>
+                  <td style="font-family:monospace; font-weight:700; font-size:13px; color:var(--accent);">${escapeHtml(lp.codigo)}</td>
+                  <td style="font-size:12px;">${escapeHtml(lp.cliente || '—')}</td>
+                  <td style="font-weight:700;">${itemCount}</td>
+                  <td>${estadoPill}</td>
+                  <td style="font-size:11px;">${escapeHtml(lp.ubicacion || 'RECEPCIÓN')}</td>
+                  <td style="font-size:11px;">${formatFecha(lp.creado_en)}</td>
+                  <td style="display:flex; gap:6px;">
+                    <button class="btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="RecepcionView._verDetalleLPN('${lp.id}', '${escapeHtml(lp.codigo)}')">Ver</button>
+                    <button class="btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="RecepcionView._imprimirEtiquetaLPN(${JSON.stringify(lp).split('"').join('&quot;')})">🖨 Etiqueta</button>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  },
+
+  async _verDetalleLPN(lpnId, lpnCodigo) {
+    const c = document.getElementById('recep-contenido');
+    c.innerHTML = `
+      <button class="btn-secondary" id="btn-volver-detalle-lpn" style="margin-bottom:12px;">← Volver a LPNs</button>
+      <div class="empty-state"><div class="empty-icon">⏳</div>Cargando detalle…</div>
+    `;
+    document.getElementById('btn-volver-detalle-lpn')?.addEventListener('click', () => {
+      this._flujo = 'lista-lpns';
+      this._renderListaLPNs(c);
+    });
+
+    const { lpn, items } = await obtenerLPNConItems(lpnId);
+    if (!lpn) {
+      c.innerHTML += '<div class="alert alert-danger">No se pudo cargar el LPN.</div>';
+      return;
+    }
+
+    const pedidos = [...new Set(items.map(i => i.paleta_pedido).filter(Boolean))];
+    const estadoPill = lpn.estado === 'UBICADO'
+      ? `<span class="pill pill-success">Ubicado</span>`
+      : `<span class="pill pill-warning">En recepción</span>`;
+
+    c.innerHTML = `
+      <button class="btn-secondary" id="btn-volver-detalle-lpn2" style="margin-bottom:12px;">← Volver a LPNs</button>
+
+      <div class="card" style="border-left:3px solid var(--accent); margin-bottom:10px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+          <div>
+            <span style="font-size:22px; font-weight:900; color:var(--accent); font-family:monospace;">${escapeHtml(lpn.codigo)}</span>
+            <span style="margin-left:8px;">${estadoPill}</span>
+          </div>
+          <button class="btn-secondary" onclick="RecepcionView._imprimirEtiquetaLPN(${JSON.stringify(lpn).split('"').join('&quot;')})">🖨 Imprimir etiqueta</button>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:8px; margin-top:12px;">
+          <div>
+            <div style="font-size:10px; color:var(--text-tertiary); text-transform:uppercase;">Cliente</div>
+            <div style="font-weight:600;">${escapeHtml(lpn.cliente || '—')}</div>
+          </div>
+          <div>
+            <div style="font-size:10px; color:var(--text-tertiary); text-transform:uppercase;">Ubicación</div>
+            <div style="font-weight:600;">${escapeHtml(lpn.ubicacion || 'RECEPCIÓN')}</div>
+          </div>
+          <div>
+            <div style="font-size:10px; color:var(--text-tertiary); text-transform:uppercase;">Pedidos</div>
+            <div style="font-weight:600; font-size:11px;">${pedidos.length ? pedidos.map(p => escapeHtml(p)).join(', ') : '—'}</div>
+          </div>
+          <div>
+            <div style="font-size:10px; color:var(--text-tertiary); text-transform:uppercase;">Total ítems</div>
+            <div style="font-weight:700; font-size:18px; color:var(--accent);">${items.length}</div>
+          </div>
+          <div>
+            <div style="font-size:10px; color:var(--text-tertiary); text-transform:uppercase;">Creado</div>
+            <div style="font-weight:600;">${formatFechaHora(lpn.creado_en)}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <p class="card-title" style="margin-bottom:8px;">Ítems en el contenedor (${items.length})</p>
+        ${items.length ? `
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr>
+                <th>#</th><th>SKU</th><th>Descripción</th><th>Serie</th><th>Cant.</th><th>Pedido</th><th>Estado</th>
+              </tr></thead>
+              <tbody>
+                ${items.map((it, i) => `
+                  <tr>
+                    <td style="color:var(--text-tertiary);">${i+1}</td>
+                    <td class="sku-cell">${escapeHtml(it.sku)}</td>
+                    <td style="font-size:10px; max-width:240px;">${escapeHtml(it.descripcion || '—')}</td>
+                    <td class="serie-cell" style="font-size:10px;">
+                      ${it.serie ? escapeHtml(it.serie) : '<span style="color:var(--text-tertiary);">Sin serie</span>'}
+                    </td>
+                    <td style="font-weight:700; color:var(--accent);">${formatNum(it.cantidad)}</td>
+                    <td style="font-size:11px;">${escapeHtml(it.paleta_pedido || '—')}</td>
+                    <td><span class="pill ${it.estado === 'DISPONIBLE' ? 'pill-success' : 'pill-warning'}" style="font-size:10px;">${escapeHtml(it.estado || '—')}</span></td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        ` : '<div class="empty-state" style="padding:16px 0;"><div class="empty-icon">📭</div>Sin ítems registrados.</div>'}
+      </div>
+    `;
+
+    document.getElementById('btn-volver-detalle-lpn2')?.addEventListener('click', () => {
+      this._flujo = 'lista-lpns';
+      this._renderListaLPNs(c);
+    });
+  },
+
+  // ============================================================
+  // IMPRESIÓN DE ETIQUETA LPN
+  // ============================================================
+  _imprimirEtiquetaLPN(lpn) {
+    if (typeof lpn === 'string') {
+      try { lpn = JSON.parse(lpn.replace(/&quot;/g, '"')); } catch(e) { alert('Error al leer datos del LPN.'); return; }
+    }
+
+    // Cargar JsBarcode si no está disponible
+    const _doImprimir = () => {
+      const pedidos = lpn._pedidos || lpn.pedidos || '';
+      const fecha   = formatFecha(lpn.creado_en);
+
+      const win = window.open('', '_blank', 'width=420,height=320');
+      win.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Etiqueta ${lpn.codigo}</title>
+          <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
+          <style>
+            @page { size: 100mm 55mm; margin: 0; }
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+              width: 100mm; height: 55mm;
+              display: flex; flex-direction: column;
+              align-items: center; justify-content: center;
+              font-family: Arial, sans-serif;
+              padding: 3mm;
+            }
+            .lpn-codigo {
+              font-size: 14pt; font-weight: 900;
+              letter-spacing: 1px; margin-bottom: 2mm;
+            }
+            svg#barcode { width: 90mm; height: 22mm; }
+            .lpn-info {
+              display: flex; gap: 6mm; margin-top: 2mm;
+              font-size: 7pt; color: #333;
+            }
+            .lpn-info span { display: flex; flex-direction: column; align-items: center; }
+            .lpn-info strong { font-size: 8pt; }
+          </style>
+        </head>
+        <body>
+          <div class="lpn-codigo">${lpn.codigo}</div>
+          <svg id="barcode"></svg>
+          <div class="lpn-info">
+            <span>CLIENTE<strong>${lpn.cliente || '—'}</strong></span>
+            <span>FECHA<strong>${fecha}</strong></span>
+            ${lpn.ubicacion && lpn.ubicacion !== 'RECEPCION' ? `<span>UBICACIÓN<strong>${lpn.ubicacion}</strong></span>` : ''}
+          </div>
+          <script>
+            window.onload = function() {
+              JsBarcode("#barcode", "${lpn.codigo}", {
+                format: "CODE128",
+                width: 2.2,
+                height: 60,
+                displayValue: false,
+                margin: 0
+              });
+              setTimeout(() => window.print(), 400);
+            };
+          <\/script>
+        </body>
+        </html>
+      `);
+      win.document.close();
+    };
+
+    _doImprimir();
   }
 };
 

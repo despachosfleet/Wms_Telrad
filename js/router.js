@@ -5,7 +5,7 @@
 
 const Router = {
   _views: {},
-  _tabs: [],          // pestañas abiertas: [{id, name, title, params, scrollY}]
+  _tabs: [],          // pestañas abiertas: [{id, name, title, params, scrollY, state}]
   _activeTab: null,   // id de la pestaña activa
   _tabCounter: 0,
   currentView: null,
@@ -13,6 +13,16 @@ const Router = {
 
   register(name, view) {
     this._views[name] = view;
+  },
+
+  // Verifica si la vista activa tiene trabajo en progreso antes de navegar
+  _confirmarSalida() {
+    const activeTab = this._tabs.find(t => t.id === this._activeTab);
+    if (!activeTab) return true;
+    const view = this._views[activeTab.name];
+    if (!view || typeof view.hasProgress !== 'function') return true;
+    if (!view.hasProgress()) return true;
+    return confirm('Tienes trabajo en progreso en esta ventana.\n¿Seguro que quieres salir? Los datos no guardados se perderán.');
   },
 
   // PC: abre o activa una pestaña. Móvil: navega normalmente
@@ -25,6 +35,11 @@ const Router = {
     if (isMobile) {
       this._navigateMobile(name, params, view);
     } else {
+      // En PC verificar si la vista activa tiene progreso antes de cambiar de módulo
+      // Solo si es un módulo diferente al actual (no aplica al cambiar entre pestañas del mismo módulo)
+      const activeTab = this._tabs.find(t => t.id === this._activeTab);
+      const esModuloDistinto = activeTab && activeTab.name !== name;
+      if (esModuloDistinto && !this._confirmarSalida()) return;
       this._navigatePC(name, params, view);
     }
 
@@ -62,7 +77,8 @@ const Router = {
     const tab = {
       id, key, name, params,
       title: view.title || name,
-      scrollY: 0
+      scrollY: 0,
+      state: null   // estado guardado de la vista
     };
     this._tabs.push(tab);
     this._activeTab = id;
@@ -77,9 +93,24 @@ const Router = {
     const tab = this._tabs.find(t => t.id === tabId);
     if (!tab) return;
 
-    // Guardar scroll de la pestaña activa
+    // Verificar progreso antes de cambiar de pestaña si son módulos distintos
+    const activeTab = this._tabs.find(t => t.id === this._activeTab);
+    if (activeTab && activeTab.name !== tab.name) {
+      const view = this._views[activeTab.name];
+      if (view && typeof view.hasProgress === 'function' && view.hasProgress()) {
+        if (!confirm('Tienes trabajo en progreso en esta ventana.\n¿Seguro que quieres salir? Los datos no guardados se perderán.')) return;
+      }
+    }
+
+    // Guardar scroll y estado de la pestaña activa
     const current = this._tabs.find(t => t.id === this._activeTab);
-    if (current) current.scrollY = window.scrollY;
+    if (current) {
+      current.scrollY = window.scrollY;
+      const currentView = this._views[current.name];
+      if (currentView && typeof currentView.saveState === 'function') {
+        current.state = currentView.saveState();
+      }
+    }
 
     this._activeTab = tabId;
     this.currentView = tab.name;
@@ -98,6 +129,16 @@ const Router = {
 
   cerrarTab(tabId, e) {
     if (e) e.stopPropagation();
+
+    // Verificar progreso antes de cerrar
+    const tab = this._tabs.find(t => t.id === tabId);
+    if (tab && tab.id === this._activeTab) {
+      const view = this._views[tab.name];
+      if (view && typeof view.hasProgress === 'function' && view.hasProgress()) {
+        if (!confirm('Tienes trabajo en progreso en esta ventana.\n¿Seguro que quieres cerrar? Los datos no guardados se perderán.')) return;
+      }
+    }
+
     const idx = this._tabs.findIndex(t => t.id === tabId);
     if (idx === -1) return;
     this._tabs.splice(idx, 1);
@@ -144,7 +185,13 @@ const Router = {
 
     const main = document.getElementById('main-content');
     main.innerHTML = `<div class="page-inner">${view.render ? view.render(tab.params) : ''}</div>`;
-    if (view.afterRender) view.afterRender(tab.params);
+
+    // Restaurar estado si existe
+    if (tab.state && view && typeof view.restoreState === 'function') {
+      view.restoreState(tab.state);
+    } else if (view.afterRender) {
+      view.afterRender(tab.params);
+    }
   },
 
   // Para compatibilidad con código que usa back()
