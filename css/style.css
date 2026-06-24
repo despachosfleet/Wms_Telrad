@@ -312,3 +312,39 @@ main{padding-top:calc(var(--header-h) + var(--nav-h));padding-bottom:32px;min-he
   .admin-grid{grid-template-columns:repeat(4,1fr);}
   .menu-grid{grid-template-columns:repeat(6,1fr);}
 }
+
+/* ============================================================
+   RECEPCIÓN — opciones de flujo
+   ============================================================ */
+.recep-opcion {
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 14px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color .15s, box-shadow .15s;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.recep-opcion:hover {
+  border-color: var(--accent);
+  box-shadow: var(--shadow);
+}
+.recep-op-icon { font-size: 22px; }
+.recep-op-titulo {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text);
+}
+.recep-op-desc {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+@media (max-width: 600px) {
+  .recep-opcion { padding: 12px; }
+  .recep-op-desc { display: none; }
+}

@@ -1083,3 +1083,159 @@ async function registrarIngresosDesdeExcel(filas) {
   const { data, error } = await sb.from('stock').insert(inserts).select();
   return { error, count: data?.length || 0 };
 }
+
+// ============================================================
+// FUNCIONES — LPNs (Contenedores físicos de recepción)
+// ============================================================
+
+// Genera el siguiente código de LPN correlativo por cliente
+// Formato: C-ENT-001, C-CLA-002, C-TEL-001, C-GEN-001
+async function generarCodigoLPN(cliente) {
+  const prefMap = { ENTEL: 'ENT', CLARO: 'CLA', TELRAD: 'TEL' };
+  const pref = prefMap[String(cliente || '').toUpperCase()] || 'GEN';
+  const patron = `C-${pref}-%`;
+
+  const { data, error } = await sb
+    .from('lpns')
+    .select('codigo')
+    .ilike('codigo', patron)
+    .order('codigo', { ascending: false })
+    .limit(1);
+
+  let siguiente = 1;
+  if (!error && data && data.length > 0) {
+    const ultimo = data[0].codigo;
+    const num = parseInt(ultimo.split('-').pop(), 10);
+    if (!isNaN(num)) siguiente = num + 1;
+  }
+  return `C-${pref}-${String(siguiente).padStart(3, '0')}`;
+}
+
+// Crea un LPN nuevo
+async function crearLPN({ codigo, cliente, n_guia, observaciones }) {
+  const { data, error } = await sb
+    .from('lpns')
+    .insert([{
+      codigo,
+      cliente: cliente || null,
+      n_guia: n_guia || null,
+      observaciones: observaciones || null,
+      estado: 'RECEPCION',
+      ubicacion: 'RECEPCION'
+    }])
+    .select()
+    .single();
+  if (error) { console.error('crearLPN:', error); return { data: null, error }; }
+  return { data, error: null };
+}
+
+// Asigna un LPN a un ítem de stock ya creado
+async function asignarLPNAStock(stockId, lpnId, lpnCodigo) {
+  const { error } = await sb
+    .from('stock')
+    .update({ lpn_id: lpnId, lpn_codigo: lpnCodigo, actualizado_en: new Date().toISOString() })
+    .eq('id', stockId);
+  return { error };
+}
+
+// Registra ítems en stock y los vincula a un LPN en una sola operación
+async function registrarItemsEnLPN(lpnId, lpnCodigo, items) {
+  const inserts = items.map(it => ({
+    sku:              String(it.MATERIAL || it.sku || '').trim().toUpperCase(),
+    descripcion:      String(it.DESCRIPCION || it.descripcion || '').trim(),
+    serie:            (it.SERIE && !String(it.SERIE).startsWith('-')) ? String(it.SERIE).trim() : null,
+    cantidad:         Number(it.CANTIDAD_RECIBIDA || it.cantidad) || 0,
+    unidad_medida:    'UND',
+    paleta_pedido:    String(it.N_PEDIDO || it.n_pedido || '').trim() || null,
+    ubicacion_fisica: 'RECEPCION',
+    cliente:          String(it.CLIENTE || it.cliente || '').trim().toUpperCase() || null,
+    gr_ingreso:       String(it.N_GUIA || it.n_guia || '').trim() || null,
+    fecha_ingreso:    new Date().toISOString().slice(0, 10),
+    condicion:        String(it.TIPO_INGRESO || it.tipo_ingreso || 'NUEVO').trim().toUpperCase(),
+    observaciones:    String(it.OBSERVACIONES || it.observaciones || '').trim() || null,
+    estado:           'DISPONIBLE',
+    tipo:             null,
+    lpn_id:           lpnId,
+    lpn_codigo:       lpnCodigo,
+    creado_en:        new Date().toISOString(),
+    actualizado_en:   new Date().toISOString()
+  })).filter(r => r.sku && r.cantidad > 0);
+
+  if (!inserts.length) return { error: 'Sin ítems válidos', count: 0 };
+
+  const { data, error } = await sb.from('stock').insert(inserts).select('id, sku');
+  if (error) { console.error('registrarItemsEnLPN:', error); return { error, count: 0 }; }
+
+  // Kardex
+  const kardexRows = (data || []).map(row => ({
+    stock_id: row.id, sku: row.sku,
+    tipo_movimiento: 'INGRESO',
+    cantidad: inserts.find(i => i.sku === row.sku)?.cantidad || 0,
+    referencia: lpnCodigo,
+    usuario: null
+  }));
+  if (kardexRows.length) await sb.from('kardex').insert(kardexRows);
+
+  return { error: null, count: data?.length || 0 };
+}
+
+// Obtener todos los LPNs con conteo de ítems
+async function obtenerLPNs({ estado = null, cliente = null } = {}) {
+  let query = sb
+    .from('lpns')
+    .select('*, stock(count)')
+    .order('creado_en', { ascending: false });
+  if (estado)  query = query.eq('estado', estado);
+  if (cliente) query = query.eq('cliente', cliente);
+  const { data, error } = await query;
+  if (error) { console.error('obtenerLPNs:', error); return []; }
+  return data || [];
+}
+
+// Obtener un LPN con todos sus ítems
+async function obtenerLPNConItems(lpnId) {
+  const { data: lpn, error: errL } = await sb
+    .from('lpns').select('*').eq('id', lpnId).single();
+  const { data: items, error: errI } = await sb
+    .from('stock').select('*').eq('lpn_id', lpnId).order('sku');
+  if (errL || errI) { console.error('obtenerLPNConItems:', errL || errI); return { lpn: null, items: [] }; }
+  return { lpn, items: items || [] };
+}
+
+// Ubica un LPN en una ubicación física real
+async function ubicarLPN(lpnId, ubicacion) {
+  const { error: errLPN } = await sb
+    .from('lpns')
+    .update({ estado: 'UBICADO', ubicacion, actualizado_en: new Date().toISOString() })
+    .eq('id', lpnId);
+  if (errLPN) return { error: errLPN };
+
+  const { error: errStock } = await sb
+    .from('stock')
+    .update({ ubicacion_fisica: ubicacion, actualizado_en: new Date().toISOString() })
+    .eq('lpn_id', lpnId)
+    .eq('estado', 'DISPONIBLE');
+
+  return { error: errStock || null };
+}
+
+// Exportar ítems de recepción al formato de 10 columnas para Sharepoint
+function exportarRecepcionAExcel(items, nombreArchivo) {
+  const filas = items.map(it => ({
+    FECHA:             it.FECHA || new Date().toLocaleDateString('es-PE'),
+    CLIENTE:           it.CLIENTE || it.cliente || '',
+    N_PEDIDO:          it.N_PEDIDO || it.paleta_pedido || '',
+    MATERIAL:          it.MATERIAL || it.sku || '',
+    DESCRIPCION:       it.DESCRIPCION || it.descripcion || '',
+    SERIE:             it.SERIE || it.serie || '-',
+    CANTIDAD_RECIBIDA: it.CANTIDAD_RECIBIDA || it.cantidad || 0,
+    N_GUIA:            it.N_GUIA || it.gr_ingreso || '',
+    TIPO_INGRESO:      it.TIPO_INGRESO || it.condicion || 'NUEVO',
+    OBSERVACIONES:     it.OBSERVACIONES || it.observaciones || ''
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(filas);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Ingresos');
+  XLSX.writeFile(wb, nombreArchivo || 'recepcion_sharepoint.xlsx');
+}
