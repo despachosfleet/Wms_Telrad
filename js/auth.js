@@ -27,7 +27,15 @@ const Auth = {
     await sb.auth.signOut();
     this._usuario = null;
     this._perfil  = null;
-    this._mostrarLogin();
+    document.body.classList.remove('is-mobile-menu');
+    // Resetear el login completamente
+    const root = document.getElementById('login-root');
+    if (root) {
+      root.innerHTML = LoginView.render();
+      LoginView.afterRender();
+    }
+    document.getElementById('app-login').style.display = '';
+    document.getElementById('app').style.display = 'none';
   },
 
   async _cargarPerfil(user) {

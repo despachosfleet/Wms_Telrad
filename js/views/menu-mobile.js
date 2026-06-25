@@ -24,7 +24,7 @@ const MenuMobileView = {
         <!-- Header del launcher -->
         <div class="mobile-menu-header">
           <div>
-            <div class="mobile-menu-saludo">Hola, ${escapeHtml(Auth.nombre().split(' ')[0])} 👋</div>
+            <div class="mobile-menu-saludo">Hola, ${escapeHtml((Auth.nombre()||Auth.email()).split('@')[0].split(' ')[0])} 👋</div>
             <div class="mobile-menu-fecha">${new Date().toLocaleDateString('es-PE',{weekday:'long',day:'numeric',month:'long'})}</div>
           </div>
           <div style="display:flex;gap:8px;align-items:center;">

@@ -89,37 +89,24 @@ function iniciarApp() {
     }
   });
 
-  // Interceptar navegación para verificar permisos
-  const _navOriginal = Router.navigate.bind(Router);
+  // Sobrescribir navigate una sola vez con permisos + control de barra móvil
+  const _navBase = Router.navigate.bind(Router);
   Router.navigate = function(name, params = {}) {
-    if (!Auth.puedeAcceder(name)) {
-      console.warn('Acceso denegado:', name);
-      return;
-    }
-    _navOriginal(name, params);
-  };
-
-  // En móvil ir al menú móvil, en PC al menú normal
-  if (esMobil()) {
-    // Ocultar header/nav en menú móvil
-    document.body.classList.add('is-mobile-menu');
-    _navOriginal('menu-mobile');
-  } else {
-    document.body.classList.remove('is-mobile-menu');
-    _navOriginal('menu');
-  }
-
-  // Al navegar en móvil, manejar header
-  const _navConHeader = Router.navigate.bind(Router);
-  Router.navigate = function(name, params = {}) {
-    if (!Auth.puedeAcceder(name)) return;
+    if (!Auth.puedeAcceder(name)) { console.warn('Acceso denegado:', name); return; }
     if (esMobil() && name === 'menu-mobile') {
       document.body.classList.add('is-mobile-menu');
     } else {
       document.body.classList.remove('is-mobile-menu');
     }
-    _navConHeader(name, params);
+    _navBase(name, params);
   };
+
+  // En móvil ir al menú móvil, en PC al menú normal
+  if (esMobil()) {
+    Router.navigate('menu-mobile');
+  } else {
+    Router.navigate('menu');
+  }
 }
 
 // Mostrar login
