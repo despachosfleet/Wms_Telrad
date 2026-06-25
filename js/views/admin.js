@@ -143,7 +143,16 @@ const AdminView = {
         </div>
       </div>
 
-      <p class="section-label" style="margin-top:16px;">Configuración</p>
+      <p class="section-label" style="margin-top:16px;">Usuarios y acceso</p>
+      <div class="admin-grid" style="margin-bottom:16px;">
+        <div class="admin-action-card" onclick="AdminView.abrirModal('gestionar-usuarios')">
+          <div class="aa-icon">👥</div>
+          <div class="aa-title">Gestionar usuarios</div>
+          <div class="aa-desc">Crear, activar o cambiar rol de usuarios del sistema</div>
+        </div>
+      </div>
+
+      <p class="section-label">Configuración</p>
       <div class="admin-grid">
         <div class="admin-action-card" onclick="AdminView.abrirModal('gestionar-condiciones')">
           <div class="aa-icon">🏷️</div>
@@ -208,6 +217,11 @@ const AdminView = {
       'cambiar-estado-orden': {
         titulo: '🔄 Cambiar estado de orden',
         body: this._bodyCambiarEstadoOrden()
+      },
+      'gestionar-usuarios': {
+        titulo: '👥 Gestionar usuarios',
+        size: 'modal-lg',
+        body: this._bodyGestionarUsuarios()
       },
       'desactivar-ubicacion': {
         titulo: '🔒 Desactivar ubicación',
@@ -466,6 +480,7 @@ const AdminView = {
       case 'cambiar-estado-orden': this._bindCambiarEstadoOrden(); break;
       case 'crear-ubicacion':    this._bindCrearUbicacion(); break;
       case 'mover-masivo':          this._bindMoverMasivo(); break;
+      case 'gestionar-usuarios':    this._bindGestionarUsuarios(); break;
       case 'desactivar-ubicacion': this._bindDesactivarUbicacion(); break;
       case 'editar-kardex':        this._bindEditarKardex(); break;
       case 'renombrar-paleta':      this._bindRenombrarPaleta(); break;
@@ -1077,6 +1092,106 @@ const AdminView = {
     document.getElementById('adm-btn-buscar-kx-edit')?.addEventListener('click', buscar);
     ['adm-kx-sku','adm-kx-serie'].forEach(id=>{
       document.getElementById(id)?.addEventListener('keydown', e=>{ if(e.key==='Enter') buscar(); });
+    });
+  },
+
+  _bodyGestionarUsuarios() {
+    return `
+      <div id="adm-usuarios-lista">
+        <div class="empty-state"><div class="empty-icon">⏳</div>Cargando usuarios…</div>
+      </div>
+      <hr style="margin:16px 0; border-color:var(--border);">
+      <p class="card-title" style="margin-bottom:10px;">Crear nuevo usuario</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div class="field"><label>Nombre</label><input type="text" id="adm-usr-nombre"></div>
+        <div class="field"><label>Correo</label><input type="email" id="adm-usr-email"></div>
+        <div class="field"><label>Contraseña</label><input type="password" id="adm-usr-pass" placeholder="Mínimo 6 caracteres"></div>
+        <div class="field"><label>Rol</label>
+          <select id="adm-usr-rol">
+            <option value="operario">Operario</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn-primary" id="adm-btn-crear-usr">+ Crear usuario</button>
+      <div id="adm-usr-msg" style="margin-top:8px;"></div>
+    `;
+  },
+
+  async _bindGestionarUsuarios() {
+    // Cargar lista de usuarios
+    const lista = await Auth.obtenerUsuarios();
+    const cont  = document.getElementById('adm-usuarios-lista');
+    if (cont) {
+      if (!lista.length) {
+        cont.innerHTML = '<p style="color:var(--text-tertiary);font-size:12px;">Sin usuarios registrados.</p>';
+      } else {
+        cont.innerHTML = `
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th><th></th></tr></thead>
+              <tbody>
+                ${lista.map(u=>`
+                  <tr>
+                    <td style="font-weight:600;">${escapeHtml(u.nombre)}</td>
+                    <td style="font-size:11px;">${escapeHtml(u.email)}</td>
+                    <td>
+                      <select class="adm-usr-rol-sel" data-uid="${u.id}" style="font-size:11px;padding:3px 6px;">
+                        <option value="operario" ${u.rol==='operario'?'selected':''}>Operario</option>
+                        <option value="admin"    ${u.rol==='admin'   ?'selected':''}>Admin</option>
+                      </select>
+                    </td>
+                    <td>
+                      <span class="pill ${u.activo?'pill-success':'pill-danger'}">${u.activo?'Activo':'Inactivo'}</span>
+                    </td>
+                    <td>
+                      <button class="btn-ghost" style="font-size:10px;padding:3px 8px;" data-toggle-usr="${u.id}" data-activo="${u.activo}">
+                        ${u.activo?'Desactivar':'Activar'}
+                      </button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+        cont.querySelectorAll('.adm-usr-rol-sel').forEach(sel=>{
+          sel.addEventListener('change', async ()=>{
+            const { error } = await Auth.actualizarRol(sel.dataset.uid, sel.value);
+            if (error) alert('Error al cambiar rol.');
+            else sel.style.color='var(--success-text)';
+          });
+        });
+        cont.querySelectorAll('[data-toggle-usr]').forEach(btn=>{
+          btn.addEventListener('click', async ()=>{
+            const activo = btn.dataset.activo === 'true';
+            const { error } = await Auth.toggleActivo(btn.dataset.toggleUsr, !activo);
+            if (error) { alert('Error.'); return; }
+            this._bindGestionarUsuarios();
+          });
+        });
+      }
+    }
+
+    // Crear usuario
+    document.getElementById('adm-btn-crear-usr')?.addEventListener('click', async ()=>{
+      const nombre = document.getElementById('adm-usr-nombre')?.value.trim();
+      const email  = document.getElementById('adm-usr-email')?.value.trim();
+      const pass   = document.getElementById('adm-usr-pass')?.value;
+      const rol    = document.getElementById('adm-usr-rol')?.value;
+      const msg    = document.getElementById('adm-usr-msg');
+      if (!nombre||!email||!pass) { msg.innerHTML='<p class="msg-error">Completa todos los campos.</p>'; return; }
+      if (pass.length < 6)        { msg.innerHTML='<p class="msg-error">La contraseña debe tener al menos 6 caracteres.</p>'; return; }
+      const btn = document.getElementById('adm-btn-crear-usr');
+      btn.disabled=true; btn.textContent='Creando…';
+      const { error } = await Auth.crearUsuario(email, pass, nombre, rol);
+      btn.disabled=false; btn.textContent='+ Crear usuario';
+      if (error) { msg.innerHTML=`<p class="msg-error">Error: ${escapeHtml(error)}</p>`; return; }
+      msg.innerHTML='<p class="msg-ok">✓ Usuario creado. Ya puede ingresar al sistema.</p>';
+      document.getElementById('adm-usr-nombre').value='';
+      document.getElementById('adm-usr-email').value='';
+      document.getElementById('adm-usr-pass').value='';
+      this._bindGestionarUsuarios();
     });
   },
 
