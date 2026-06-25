@@ -23,15 +23,14 @@ const MenuMobileView = {
       <div class="mobile-menu">
         <!-- Header del launcher -->
         <div class="mobile-menu-header">
-          <div>
-            <div class="mobile-menu-saludo">Hola, ${escapeHtml((Auth.nombre()||Auth.email()).split('@')[0].split(' ')[0])} 👋</div>
+          <div id="mobile-saludo-wrap">
+            <div class="mobile-menu-saludo" id="mobile-saludo-txt">Hola, ${escapeHtml((Auth.nombre()||Auth.email()).split('@')[0].split(' ')[0])} 👋</div>
             <div class="mobile-menu-fecha">${new Date().toLocaleDateString('es-PE',{weekday:'long',day:'numeric',month:'long'})}</div>
           </div>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <button class="mobile-menu-logout" onclick="Auth.logout()" title="Cerrar sesión">
-              <svg viewBox="0 0 24 24" width="18" height="18"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
-            </button>
-          </div>
+          <button class="mobile-menu-logout" onclick="Auth.logout()">
+            <svg viewBox="0 0 24 24" width="16" height="16"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+            <span style="font-size:12px;font-weight:600;">Salir</span>
+          </button>
         </div>
 
         <!-- Dashboard rápido -->
@@ -69,6 +68,15 @@ const MenuMobileView = {
       btn.addEventListener('click', ()=>Router.navigate(btn.dataset.nav));
     });
     this._cargarDash();
+    // Saludo desaparece después de 3 segundos
+    setTimeout(() => {
+      const wrap = document.getElementById('mobile-saludo-wrap');
+      if (wrap) {
+        wrap.style.transition = 'opacity .5s';
+        wrap.style.opacity = '0';
+        setTimeout(() => { if(wrap) wrap.style.display='none'; }, 500);
+      }
+    }, 3000);
   },
 
   async _cargarDash() {

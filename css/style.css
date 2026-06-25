@@ -190,6 +190,14 @@ main{padding-top:calc(var(--header-h) + var(--nav-h));padding-bottom:32px;min-he
 /* Solo visible en PC */
 .solo-pc { display: none; }
 
+/* En móvil: ocultar barra de módulos y pestañas siempre */
+@media(max-width:639px) {
+  .module-nav,
+  .tab-bar,
+  .module-dropdown-panel { display: none !important; }
+  #btn-home-main span { display: inline; }
+}
+
 @media(min-width:640px){
   .solo-pc { display: block; }
   .filtros-barra{padding:10px 14px;}
@@ -485,9 +493,11 @@ main{padding-top:calc(var(--header-h) + var(--nav-h));padding-bottom:32px;min-he
   border: 1px solid rgba(255,255,255,.2);
   border-radius: var(--radius-sm);
   color: white; cursor: pointer;
-  padding: 6px; display: flex; align-items: center; justify-content: center;
+  padding: 6px 10px;
+  display: flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 600;
 }
-.mobile-menu-logout svg { fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round; }
+.mobile-menu-logout svg { fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0; }
 
 .mobile-dash {
   display: flex;
