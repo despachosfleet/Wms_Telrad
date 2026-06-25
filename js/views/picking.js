@@ -153,6 +153,7 @@ const PickingView = {
     const completados = this._items.filter(it=> this._pickeado(it));
 
     wrap.innerHTML=`
+      <button class="btn-secondary" style="margin-bottom:10px; font-size:12px;" onclick="Router.navigate('picking-lista')">← Volver a órdenes</button>
       <!-- HEADER: color diferenciado, fondo azul oscuro -->
       <div style="
         background: var(--bg-header);
@@ -478,6 +479,7 @@ const PickingDetalleView = {
     if(!despacho){cont.innerHTML='<div class="empty-state">No encontrado.</div>';return;}
     const est=calcularEstadoVisual({...despacho,despachos_items:items});
     cont.innerHTML=`
+      <button class="btn-secondary" style="margin-bottom:10px; font-size:12px;" onclick="Router.navigate('picking-lista')">← Volver a órdenes</button>
       <div class="card">
         <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; flex-wrap:wrap;">
           <div>

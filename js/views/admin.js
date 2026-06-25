@@ -301,9 +301,8 @@ const AdminView = {
   _bodyEditarStock() {
     return `
       <p style="font-size:12px; color:var(--text-secondary); margin-bottom:10px;">
-        Busca por uno o más campos. Puedes editar SKU, serie, cantidad, paleta/pedido y ubicación.
-        Si cambias el nombre de paleta/pedido se actualiza <strong>solo ese ítem</strong> —
-        usa <em>Renombrar paleta/pedido masivo</em> para cambiar todos los ítems de una paleta a la vez.
+        Busca por uno o más campos. Aquí puedes corregir el <strong>código SKU</strong>, la <strong>serie</strong> o la <strong>cantidad</strong> de un ítem.
+        Para mover a otra paleta/pedido o ubicación usa los módulos <em>Movimientos</em> o <em>Renombrar paleta/pedido</em>.
       </p>
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
         <div class="field"><label>SKU</label><input id="adm-busq-sku" type="text" autocomplete="off"></div>
@@ -563,13 +562,16 @@ const AdminView = {
       const { data } = await buscarStockAvanzado({ sku, serie, descripcion: desc, paleta, limit: 50 });
       if (!data?.length) { cont.innerHTML = '<p class="msg-error">No encontrado.</p>'; return; }
       cont.innerHTML = `
-        <p style="font-size:11px; color:var(--text-tertiary); margin-bottom:6px;">${data.length} ítem${data.length!==1?'s':''} — editables directamente</p>
+        <p style="font-size:11px; color:var(--text-tertiary); margin-bottom:6px;">
+          ${data.length} ítem${data.length!==1?'s':''} — edita SKU, serie y cantidad.
+          Para cambiar paleta/pedido o ubicación usa <strong>Renombrar paleta/pedido</strong> o <strong>Movimientos</strong>.
+        </p>
         <div class="table-wrap">
           <table class="data-table">
             <thead><tr>
-              <th>SKU<br><small style="font-weight:400;color:var(--accent);font-size:9px;">editable</small></th>
-              <th>Serie<br><small style="font-weight:400;color:var(--accent);font-size:9px;">editable</small></th>
-              <th>Cant.</th>
+              <th>SKU <small style="font-weight:400;color:var(--accent);font-size:9px;">editable</small></th>
+              <th>Serie <small style="font-weight:400;color:var(--accent);font-size:9px;">editable</small></th>
+              <th>Cant. <small style="font-weight:400;color:var(--accent);font-size:9px;">editable</small></th>
               <th>Paleta/Pedido</th>
               <th>Ubicación</th>
               <th></th>
@@ -590,18 +592,10 @@ const AdminView = {
                   <td>
                     <input type="number" value="${r.cantidad}" min="0"
                       id="adm-cant-${r.id}"
-                      style="width:65px; text-align:center; background:var(--bg-input); border:1px solid var(--border-strong); border-radius:4px; padding:3px 6px; font-weight:700;">
+                      style="width:65px; text-align:center; background:var(--bg-input); border:1px solid var(--accent-dim); border-radius:4px; padding:3px 6px; font-weight:700;">
                   </td>
-                  <td>
-                    <input type="text" value="${escapeHtml(r.paleta_pedido||'')}"
-                      id="adm-pp-${r.id}"
-                      style="width:110px; background:var(--bg-input); border:1px solid var(--border-strong); border-radius:4px; padding:3px 6px; font-size:11px;">
-                  </td>
-                  <td>
-                    <input type="text" value="${escapeHtml(r.ubicacion_fisica||'')}"
-                      id="adm-ubic-${r.id}"
-                      style="width:90px; background:var(--bg-input); border:1px solid var(--border-strong); border-radius:4px; padding:3px 6px; font-size:11px;">
-                  </td>
+                  <td style="font-size:11px; color:var(--text-secondary);">${escapeHtml(r.paleta_pedido||'-')}</td>
+                  <td style="font-size:11px; color:var(--text-secondary);">${escapeHtml(r.ubicacion_fisica||'-')}</td>
                   <td>
                     <button class="btn-primary" style="padding:5px 10px; font-size:11px;" data-guardar-stock="${r.id}">Guardar</button>
                   </td>
@@ -617,11 +611,9 @@ const AdminView = {
           const sku  = document.getElementById(`adm-sku-edit-${id}`)?.value.trim().toUpperCase();
           const serie= document.getElementById(`adm-serie-edit-${id}`)?.value.trim();
           const cant = Number(document.getElementById(`adm-cant-${id}`)?.value);
-          const pp   = document.getElementById(`adm-pp-${id}`)?.value.trim();
-          const ubic = document.getElementById(`adm-ubic-${id}`)?.value.trim();
           if (!sku) { alert('El SKU no puede quedar vacío.'); return; }
           btn.disabled = true; btn.textContent = '…';
-          const { error } = await editarStock(id, { sku, serie, cantidad: cant, paleta_pedido: pp, ubicacion_fisica: ubic });
+          const { error } = await editarStock(id, { sku, serie, cantidad: cant });
           btn.disabled = false;
           btn.textContent = error ? '❌ Error' : '✓ Guardado';
           btn.className   = error ? 'btn-danger' : 'btn-success';

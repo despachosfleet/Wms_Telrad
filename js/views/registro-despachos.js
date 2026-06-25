@@ -12,23 +12,24 @@ const RegistroDespachosView = {
   render() {
     return `
       <div class="card">
-        <div class="field-grid">
-          <div class="field" style="grid-column: span 2;">
-            <label>Buscar (GR, SKU, serie, cliente, destino)</label>
-            <input type="text" id="f-buscar-registro" placeholder="" />
+        <div class="filtros-grid">
+          <div class="field"><label>N° GR</label><input type="text" id="f-gr-registro" autocomplete="off"></div>
+          <div class="field"><label>Cliente</label>
+            <select id="f-cliente-registro">
+              <option value="">Todos</option>
+              <option>ENTEL</option><option>CLARO</option><option>TELRAD</option>
+            </select>
           </div>
-          <div class="field">
-            <label>Desde</label>
-            <input type="date" id="f-desde-registro" />
-          </div>
-          <div class="field">
-            <label>Hasta</label>
-            <input type="date" id="f-hasta-registro" />
-          </div>
+          <div class="field"><label>Destino / Destinatario</label><input type="text" id="f-destino-registro" autocomplete="off"></div>
+          <div class="field"><label>SKU</label><input type="text" id="f-sku-registro" autocomplete="off"></div>
+          <div class="field"><label>Serie</label><input type="text" id="f-serie-registro" autocomplete="off" style="font-family:monospace;"></div>
+          <div class="field"><label>Fecha desde</label><input type="date" id="f-desde-registro"></div>
+          <div class="field"><label>Fecha hasta</label><input type="date" id="f-hasta-registro"></div>
         </div>
-        <div style="display:flex; gap:10px; margin-top:10px;">
-          <button class="btn-primary" id="btn-filtrar-registro" style="width:auto; padding:8px 16px;">Filtrar</button>
-          <button class="btn-text" id="btn-exportar-registro">Exportar a Excel</button>
+        <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
+          <button class="btn-primary" id="btn-filtrar-registro">Buscar</button>
+          <button class="btn-ghost"   id="btn-limpiar-registro">Limpiar</button>
+          <button class="btn-secondary" id="btn-exportar-registro">↓ Exportar Excel</button>
         </div>
       </div>
       <div id="lista-registro-cont"></div>
@@ -36,21 +37,35 @@ const RegistroDespachosView = {
   },
 
   afterRender() {
-    document.getElementById('btn-filtrar-registro').addEventListener('click', () => this.cargarYRender());
-    document.getElementById('btn-exportar-registro').addEventListener('click', () => this.exportar());
-    document.getElementById('f-buscar-registro').addEventListener('input', (e) => {
-      this._filtroTexto = e.target.value.trim().toLowerCase();
-      this.renderLista();
+    document.getElementById('btn-filtrar-registro')?.addEventListener('click',  () => this.cargarYRender());
+    document.getElementById('btn-exportar-registro')?.addEventListener('click', () => this.exportar());
+    document.getElementById('btn-limpiar-registro')?.addEventListener('click',  () => {
+      ['f-gr-registro','f-destino-registro','f-sku-registro','f-serie-registro','f-desde-registro','f-hasta-registro'].forEach(id=>{
+        const el=document.getElementById(id); if(el) el.value='';
+      });
+      const cl=document.getElementById('f-cliente-registro'); if(cl) cl.value='';
+      this._filtros={};
+      document.getElementById('lista-registro-cont').innerHTML='';
+    });
+    ['f-gr-registro','f-destino-registro','f-sku-registro','f-serie-registro'].forEach(id=>{
+      document.getElementById(id)?.addEventListener('keydown', e=>{ if(e.key==='Enter') this.cargarYRender(); });
     });
     this.cargarYRender();
   },
 
   async cargarYRender() {
     const cont = document.getElementById('lista-registro-cont');
-    cont.innerHTML = `<div class="empty-state">Cargando...</div>`;
+    cont.innerHTML = `<div class="empty-state"><div class="empty-icon">⏳</div>Cargando…</div>`;
 
-    const desde = document.getElementById('f-desde-registro').value;
-    const hasta = document.getElementById('f-hasta-registro').value;
+    const desde   = document.getElementById('f-desde-registro')?.value;
+    const hasta   = document.getElementById('f-hasta-registro')?.value;
+    const gr      = document.getElementById('f-gr-registro')?.value.trim().toLowerCase()      || '';
+    const destino = document.getElementById('f-destino-registro')?.value.trim().toLowerCase() || '';
+    const sku     = document.getElementById('f-sku-registro')?.value.trim().toLowerCase()     || '';
+    const serie   = document.getElementById('f-serie-registro')?.value.trim().toLowerCase()   || '';
+    const cliente = document.getElementById('f-cliente-registro')?.value || '';
+
+    this._filtros = { gr, destino, sku, serie, cliente };
 
     this._despachos = await obtenerTodosLosDespachos({
       fechaDesde: desde ? new Date(desde).toISOString() : null,
@@ -63,16 +78,16 @@ const RegistroDespachosView = {
   renderLista() {
     const cont = document.getElementById('lista-registro-cont');
     let lista = this._despachos;
+    const f = this._filtros || {};
 
-    if (this._filtroTexto) {
-      const t = this._filtroTexto;
-      lista = lista.filter(d => {
-        const camposCabecera = [d.gr, d.cliente, d.destino].filter(Boolean).join(' ').toLowerCase();
-        if (camposCabecera.includes(t)) return true;
-        return (d.despachos_items || []).some(it =>
-          [it.sku, it.serie].filter(Boolean).join(' ').toLowerCase().includes(t)
-        );
-      });
+    if (f.gr)      lista = lista.filter(d => (d.gr||'').toLowerCase().includes(f.gr));
+    if (f.destino) lista = lista.filter(d => (d.destino||'').toLowerCase().includes(f.destino) || (d.razon_social||'').toLowerCase().includes(f.destino));
+    if (f.cliente) lista = lista.filter(d => (d.cliente||'').toUpperCase() === f.cliente.toUpperCase());
+    if (f.sku || f.serie) {
+      lista = lista.filter(d => (d.despachos_items||[]).some(it =>
+        (!f.sku   || (it.sku  ||'').toLowerCase().includes(f.sku))  &&
+        (!f.serie || (it.serie||'').toLowerCase().includes(f.serie))
+      ));
     }
 
     if (lista.length === 0) {
