@@ -477,7 +477,7 @@ main{padding-top:calc(var(--header-h) + var(--nav-h));padding-bottom:32px;min-he
 .mobile-menu-header {
   background: var(--bg-header);
   color: var(--text-header);
-  padding: 16px 16px 14px;
+  padding: 10px 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;

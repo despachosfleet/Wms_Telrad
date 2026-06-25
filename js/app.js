@@ -104,6 +104,10 @@ function iniciarApp() {
   // En móvil ir al menú móvil, en PC al menú normal
   if (esMobil()) {
     Router.navigate('menu-mobile');
+    // Interceptar botón atrás del navegador en móvil
+    window.addEventListener('popstate', () => {
+      if (esMobil()) Router.navigate('menu-mobile');
+    });
   } else {
     Router.navigate('menu');
   }

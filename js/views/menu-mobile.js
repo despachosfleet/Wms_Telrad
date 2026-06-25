@@ -23,13 +23,15 @@ const MenuMobileView = {
       <div class="mobile-menu">
         <!-- Header del launcher -->
         <div class="mobile-menu-header">
-          <div id="mobile-saludo-wrap">
-            <div class="mobile-menu-saludo" id="mobile-saludo-txt">Hola, ${escapeHtml((Auth.nombre()||Auth.email()).split('@')[0].split(' ')[0])} 👋</div>
-            <div class="mobile-menu-fecha">${new Date().toLocaleDateString('es-PE',{weekday:'long',day:'numeric',month:'long'})}</div>
+          <div style="display:flex;flex-direction:column;gap:2px;">
+            <div style="font-size:13px;font-weight:900;letter-spacing:-0.3px;">▸ Fleet WMS — Telrad</div>
+            <div id="mobile-saludo-wrap" style="font-size:11px;opacity:.75;">
+              Hola, ${escapeHtml((Auth.nombre()||Auth.email()).split('@')[0].split(' ')[0])} · ${new Date().toLocaleDateString('es-PE',{weekday:'long',day:'numeric',month:'long'})}
+            </div>
           </div>
           <button class="mobile-menu-logout" onclick="Auth.logout()">
-            <svg viewBox="0 0 24 24" width="16" height="16"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
-            <span style="font-size:12px;font-weight:600;">Salir</span>
+            <svg viewBox="0 0 24 24" width="14" height="14"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+            <span>Salir</span>
           </button>
         </div>
 
@@ -68,15 +70,17 @@ const MenuMobileView = {
       btn.addEventListener('click', ()=>Router.navigate(btn.dataset.nav));
     });
     this._cargarDash();
-    // Saludo desaparece después de 3 segundos
+    // Saludo desaparece después de 4 segundos
     setTimeout(() => {
       const wrap = document.getElementById('mobile-saludo-wrap');
       if (wrap) {
-        wrap.style.transition = 'opacity .5s';
+        wrap.style.transition = 'opacity .8s';
         wrap.style.opacity = '0';
-        setTimeout(() => { if(wrap) wrap.style.display='none'; }, 500);
+        setTimeout(() => {
+          if(wrap) wrap.style.visibility = 'hidden';
+        }, 800);
       }
-    }, 3000);
+    }, 4000);
   },
 
   async _cargarDash() {
