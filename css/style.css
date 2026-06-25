@@ -148,7 +148,7 @@ main{padding-top:calc(var(--header-h) + var(--nav-h));padding-bottom:32px;min-he
 }
 .filtros-grid{
   display:grid;
-  grid-template-columns:1.5fr 1fr 1.5fr 1fr 1fr;
+  grid-template-columns:1fr 1fr;
   gap:6px;
   margin-bottom:8px;
 }
@@ -163,6 +163,10 @@ main{padding-top:calc(var(--header-h) + var(--nav-h));padding-bottom:32px;min-he
 .filtros-barra .field input,
 .filtros-barra .field select{padding:6px 8px;font-size:12px;}
 .chips-inline{display:flex;gap:5px;flex-wrap:wrap;align-items:center;}
+@media(min-width:640px){
+  .filtros-grid{ grid-template-columns:1.5fr 1fr 1.5fr 1fr 1fr; }
+  .filtros-grid-2{ grid-template-columns:1fr 1fr auto auto; }
+}
 .chips-inline .chip{padding:3px 10px;font-size:10px;}
 
 /* CARDS */

@@ -600,11 +600,7 @@ const AdminView = {
                       id="adm-serie-edit-${r.id}"
                       style="width:130px; font-family:monospace; font-size:10px; background:var(--bg-input); border:1px solid var(--accent-dim); border-radius:4px; padding:3px 6px;">
                   </td>
-                  <td>
-                    <input type="number" value="${r.cantidad}" min="0"
-                      id="adm-cant-${r.id}"
-                      style="width:65px; text-align:center; background:var(--bg-input); border:1px solid var(--accent-dim); border-radius:4px; padding:3px 6px; font-weight:700;">
-                  </td>
+                  <td style="font-weight:700; color:var(--accent); text-align:center;">${formatNum(r.cantidad)}</td>
                   <td style="font-size:11px; color:var(--text-secondary);">${escapeHtml(r.paleta_pedido||'-')}</td>
                   <td style="font-size:11px; color:var(--text-secondary);">${escapeHtml(r.ubicacion_fisica||'-')}</td>
                   <td>
@@ -621,10 +617,9 @@ const AdminView = {
           const id   = Number(btn.dataset.guardarStock);
           const sku  = document.getElementById(`adm-sku-edit-${id}`)?.value.trim().toUpperCase();
           const serie= document.getElementById(`adm-serie-edit-${id}`)?.value.trim();
-          const cant = Number(document.getElementById(`adm-cant-${id}`)?.value);
           if (!sku) { alert('El SKU no puede quedar vacío.'); return; }
           btn.disabled = true; btn.textContent = '…';
-          const { error } = await editarStock(id, { sku, serie, cantidad: cant });
+          const { error } = await editarStock(id, { sku, serie });
           btn.disabled = false;
           btn.textContent = error ? '❌ Error' : '✓ Guardado';
           btn.className   = error ? 'btn-danger' : 'btn-success';

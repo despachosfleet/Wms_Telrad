@@ -80,10 +80,16 @@ const PickingListaView = {
     document.getElementById('lista-pick-cont').innerHTML='<div class="empty-state"><div class="empty-icon">⏳</div>Cargando…</div>';
     const desde   = document.getElementById('pick-desde')?.value;
     const hasta   = document.getElementById('pick-hasta')?.value;
-    this._despachos = await obtenerTodosLosDespachos({
-      fechaDesde: desde ? desde+'T00:00:00' : null,
-      fechaHasta: hasta ? hasta+'T23:59:59' : null,
-    });
+    // Dashboard: carga TODOS (sin filtro de fecha) para mostrar totales reales del sistema
+    const [todosDespachos, filtrados] = await Promise.all([
+      obtenerTodosLosDespachos({}),
+      obtenerTodosLosDespachos({
+        fechaDesde: desde ? desde+'T00:00:00' : null,
+        fechaHasta: hasta ? hasta+'T23:59:59' : null,
+      })
+    ]);
+    this._todosDespachos = todosDespachos;
+    this._despachos = filtrados;
     this._renderDashboard();
     this._renderLista();
   },
@@ -91,7 +97,8 @@ const PickingListaView = {
   _renderDashboard() {
     const dash = document.getElementById('pick-dashboard');
     if (!dash) return;
-    const todos = this._despachos.filter(d=>d.status!=='BORRADOR');
+    // Siempre usa TODOS los despachos para el dashboard
+    const todos = (this._todosDespachos || this._despachos).filter(d=>d.status!=='BORRADOR');
     const conts = {PENDIENTE:0, EN_PROCESO:0, PICKEADO:0, DESPACHADO:0};
     todos.forEach(d => { const e=calcularEstadoVisual(d); if(conts[e]!==undefined) conts[e]++; });
     dash.innerHTML = [
@@ -623,10 +630,15 @@ const DespachosSalidasView = {
     document.getElementById('lista-ds').innerHTML='<div class="empty-state"><div class="empty-icon">⏳</div>Cargando…</div>';
     const desde = document.getElementById('ds-desde')?.value;
     const hasta = document.getElementById('ds-hasta')?.value;
-    this._despachos = await obtenerTodosLosDespachos({
-      fechaDesde: desde ? desde+'T00:00:00' : null,
-      fechaHasta: hasta ? hasta+'T23:59:59' : null,
-    });
+    const [todosDespachos, filtrados] = await Promise.all([
+      obtenerTodosLosDespachos({}),
+      obtenerTodosLosDespachos({
+        fechaDesde: desde ? desde+'T00:00:00' : null,
+        fechaHasta: hasta ? hasta+'T23:59:59' : null,
+      })
+    ]);
+    this._todosDespachos = todosDespachos;
+    this._despachos = filtrados;
     this._renderDashboard();
     this._renderLista();
   },
@@ -634,7 +646,7 @@ const DespachosSalidasView = {
   _renderDashboard() {
     const dash = document.getElementById('ds-dashboard');
     if (!dash) return;
-    const todos = this._despachos.filter(d=>d.status!=='BORRADOR');
+    const todos = (this._todosDespachos || this._despachos).filter(d=>d.status!=='BORRADOR');
     const conts = {PICKEADO:0, DESPACHADO:0};
     todos.forEach(d => { const e=calcularEstadoVisual(d); if(conts[e]!==undefined) conts[e]++; });
     dash.innerHTML = [

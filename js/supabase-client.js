@@ -78,13 +78,7 @@ async function contarStock() {
 }
 
 async function obtenerResumenStock() {
-  // Trae conteos agrupados por tipo y cliente en una sola consulta
-  const { data, error } = await sb
-    .from('stock')
-    .select('tipo, cliente, estado')
-    .in('estado', ['DISPONIBLE', 'RESERVADO']);
-  if (error || !data) return null;
-
+  // Usa count agrupado en lugar de traer todas las filas (evita límite de 1000)
   const res = {
     mudanza:      { total: 0, entel: 0, claro: 0, telrad: 0 },
     ingresoNuevo: { total: 0, entel: 0, claro: 0, telrad: 0 },
@@ -92,23 +86,34 @@ async function obtenerResumenStock() {
     totalReservado:  0,
   };
 
-  data.forEach(r => {
-    const tipo    = (r.tipo    || '').toUpperCase();
-    const cliente = (r.cliente || '').toUpperCase();
-    const estado  = (r.estado  || '').toUpperCase();
+  // Hacemos 4 consultas de count por combinación tipo+estado
+  const combos = [
+    { tipo: 'MUDANZA',       estado: 'DISPONIBLE' },
+    { tipo: 'MUDANZA',       estado: 'RESERVADO'  },
+    { tipo: 'INGRESO NUEVO', estado: 'DISPONIBLE' },
+    { tipo: 'INGRESO NUEVO', estado: 'RESERVADO'  },
+  ];
 
-    if (estado === 'DISPONIBLE') res.totalDisponible++;
-    if (estado === 'RESERVADO')  res.totalReservado++;
+  for (const combo of combos) {
+    // Count total para este combo
+    const { count: total } = await sb.from('stock')
+      .select('*', { count: 'exact', head: true })
+      .eq('tipo', combo.tipo).eq('estado', combo.estado);
 
-    const bucket = tipo === 'MUDANZA' ? res.mudanza
-                 : tipo === 'INGRESO NUEVO' ? res.ingresoNuevo
-                 : null;
-    if (!bucket) return;
-    bucket.total++;
-    if (cliente === 'ENTEL')  bucket.entel++;
-    else if (cliente === 'CLARO')  bucket.claro++;
-    else if (cliente === 'TELRAD') bucket.telrad++;
-  });
+    const bucket = combo.tipo === 'MUDANZA' ? res.mudanza : res.ingresoNuevo;
+    bucket.total += (total || 0);
+    if (combo.estado === 'DISPONIBLE') res.totalDisponible += (total || 0);
+    if (combo.estado === 'RESERVADO')  res.totalReservado  += (total || 0);
+
+    // Count por cliente
+    for (const cliente of ['ENTEL', 'CLARO', 'TELRAD']) {
+      const { count } = await sb.from('stock')
+        .select('*', { count: 'exact', head: true })
+        .eq('tipo', combo.tipo).eq('estado', combo.estado).eq('cliente', cliente);
+      const key = cliente.toLowerCase();
+      bucket[key] = (bucket[key] || 0) + (count || 0);
+    }
+  }
 
   return res;
 }
