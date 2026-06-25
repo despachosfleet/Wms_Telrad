@@ -124,7 +124,10 @@ const ConsultaView = {
       return `<th class="sortable" data-col="${campo}">${label}${act?(this._dir==='asc'?' ↑':' ↓'):''}</th>`;
     };
     cont.innerHTML=`
-      <p style="font-size:11px;color:var(--text-tertiary);margin-bottom:5px;">${this._resultados.length} resultado${this._resultados.length!==1?'s':''} · clic en fila para ver detalle</p>
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:5px; gap:8px;">
+        <p style="font-size:11px;color:var(--text-tertiary);margin:0;">${this._resultados.length} resultado${this._resultados.length!==1?'s':''} · clic en fila para ver detalle</p>
+        <button class="btn-secondary" id="btn-exportar-consulta" style="font-size:11px; padding:4px 10px; flex-shrink:0;">↓ Excel</button>
+      </div>
       <div class="table-wrap">
         <table class="data-table">
           <thead><tr>
@@ -135,6 +138,7 @@ const ConsultaView = {
           <tbody id="tbody-stock">${this._renderFilas()}</tbody>
         </table>
       </div>`;
+    document.getElementById('btn-exportar-consulta')?.addEventListener('click', ()=>this._exportar());
     cont.querySelectorAll('th.sortable').forEach(th=>{
       th.addEventListener('click', ()=>{
         const col=th.dataset.col;
@@ -183,6 +187,27 @@ const ConsultaView = {
         </td></tr>`:''}
       `;
     }).join('');
+  },
+
+  async _exportar() {
+    if (!this._resultados.length) return;
+    await cargarXlsx();
+    const ws = XLSX.utils.json_to_sheet(this._resultados.map(r=>({
+      SKU:           r.sku,
+      Descripcion:   r.descripcion||'',
+      Serie:         r.serie||'',
+      Cantidad:      r.cantidad,
+      Cliente:       r.cliente||'',
+      PaletaPedido:  r.paleta_pedido||'',
+      Ubicacion:     r.ubicacion_fisica||'',
+      Tipo:          r.tipo||'',
+      Estado:        r.estado||'',
+      Condicion:     r.condicion||'',
+      FechaIngreso:  r.fecha_ingreso||'',
+    })));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Stock');
+    XLSX.writeFile(wb, `consulta_stock_${new Date().toISOString().slice(0,10)}.xlsx`);
   },
 
   _bindFilas() {

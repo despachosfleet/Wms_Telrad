@@ -391,3 +391,36 @@ main{padding-top:calc(var(--header-h) + var(--nav-h));padding-bottom:32px;min-he
   .recep-opcion { padding: 12px; }
   .recep-op-desc { display: none; }
 }
+
+/* ============================================================
+   PICKING — modal selector de serie/paleta
+   ============================================================ */
+.pick-modal-overlay {
+  position: fixed; inset: 0; z-index: 9000;
+  background: rgba(0,0,0,.55);
+  display: flex; align-items: flex-end; justify-content: center;
+}
+@media(min-width:640px){
+  .pick-modal-overlay { align-items: center; }
+}
+.pick-modal {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding: 20px 16px;
+  width: 100%; max-width: 480px;
+  max-height: 70vh; overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+}
+@media(min-width:640px){
+  .pick-modal { border-radius: var(--radius-lg); }
+}
+.pick-modal-opcion {
+  padding: 10px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 6px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.pick-modal-opcion:hover { border-color: var(--accent); background: var(--accent-dim); }
+.pick-modal-opcion.recomendada { border-color: var(--success); background: var(--success-bg); }

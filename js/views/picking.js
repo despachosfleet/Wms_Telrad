@@ -350,14 +350,28 @@ const PickingView = {
               min="0" step="1" style="font-size:17px; font-weight:900; text-align:center; color:var(--accent);">
           </div>
         </div>
-        <div class="field">
-          <label>Serie</label>
-          <input type="text" id="pick-serie-${idx}" value="${escapeHtml(serie)}"
-            placeholder="Sin serie" style="font-family:monospace; font-size:13px;">
-        </div>
+        <!-- Pedido/Paleta con selector -->
         <div class="field">
           <label>Pedido / Paleta</label>
-          <input type="text" id="pick-pp-${idx}" value="${escapeHtml(it.paleta_pedido||'')}">
+          <div style="display:flex; gap:6px;">
+            <input type="text" id="pick-pp-${idx}" value="${escapeHtml(it.paleta_pedido||'')}" style="flex:1;">
+            <button class="btn-icon btn-scan" style="flex-shrink:0;" title="Seleccionar paleta/pedido disponible"
+              onclick="event.stopPropagation(); PickingView._abrirSelectorPP(${idx})">
+              <svg viewBox="0 0 24 24" width="16" height="16"><path d="M21 10H3M16 6l-4-4-4 4M8 18l4 4 4-4"/></svg>
+            </button>
+          </div>
+        </div>
+        <!-- Serie con selector -->
+        <div class="field">
+          <label>Serie</label>
+          <div style="display:flex; gap:6px;">
+            <input type="text" id="pick-serie-${idx}" value="${escapeHtml(serie)}"
+              placeholder="Sin serie" style="font-family:monospace; font-size:13px; flex:1;">
+            <button class="btn-icon btn-scan" style="flex-shrink:0;" title="Ver series disponibles"
+              onclick="event.stopPropagation(); PickingView._abrirSelectorSerie(${idx})">
+              <svg viewBox="0 0 24 24" width="16" height="16"><path d="M21 10H3M16 6l-4-4-4 4M8 18l4 4 4-4"/></svg>
+            </button>
+          </div>
         </div>
         <div class="field">
           <label>Observación</label>
@@ -446,6 +460,117 @@ const PickingView = {
       const src=document.getElementById(`stock-source-${idx}`);
       if (src) { src.innerHTML=this._renderStockOpc(this._stockOpciones[it.id],idx); this._bindAlt(idx); }
     }
+  },
+
+  _abrirSelectorPP(idx) {
+    const it  = this._items[idx];
+    const opc = this._stockOpciones[it.id];
+    const opciones = [];
+    if (opc?.principal?.stock?.paleta_pedido) opciones.push({ pp: opc.principal.stock.paleta_pedido, cant: opc.principal.stock.cantidad, orig: opc.principal.origen });
+    if (opc?.alternativas) opc.alternativas.forEach(a => { if (a.stock?.paleta_pedido) opciones.push({ pp: a.stock.paleta_pedido, cant: a.stock.cantidad, orig: a.origen }); });
+
+    if (!opciones.length) { alert('No hay paletas/pedidos alternativos disponibles para este SKU.'); return; }
+
+    const modal = document.createElement('div');
+    modal.className = 'pick-modal-overlay';
+    modal.innerHTML = `
+      <div class="pick-modal">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <strong>Seleccionar Paleta / Pedido</strong>
+          <button class="btn-icon" onclick="this.closest('.pick-modal-overlay').remove()">✕</button>
+        </div>
+        <p style="font-size:11px; color:var(--text-secondary); margin-bottom:10px;">
+          Si seleccionas uno distinto al recomendado se mostrará una alerta de confirmación.
+        </p>
+        ${opciones.map((o,i) => `
+          <div class="pick-modal-opcion ${i===0?'recomendada':''}" data-pp="${escapeHtml(o.pp)}">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <span style="font-family:monospace; font-weight:700; font-size:13px;">${escapeHtml(o.pp)}</span>
+                ${i===0?'<span class="pill pill-success" style="font-size:10px; margin-left:6px;">Recomendado</span>':''}
+              </div>
+              <span style="font-size:11px; color:var(--text-secondary);">Disp: ${formatNum(o.cant)}</span>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    document.body.appendChild(modal);
+    modal.querySelectorAll('.pick-modal-opcion').forEach((el, i) => {
+      el.addEventListener('click', () => {
+        const pp = el.dataset.pp;
+        const actual = document.getElementById(`pick-pp-${idx}`)?.value;
+        if (i > 0 && pp !== actual) {
+          if (!confirm(`Vas a cambiar de "${actual}" a "${pp}". ¿Confirmas que es correcto?`)) return;
+        }
+        const inp = document.getElementById(`pick-pp-${idx}`);
+        if (inp) inp.value = pp;
+        modal.remove();
+      });
+    });
+    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  },
+
+  async _abrirSelectorSerie(idx) {
+    const it  = this._items[idx];
+    const ppEl = document.getElementById(`pick-pp-${idx}`);
+    const pp   = ppEl?.value || it.paleta_pedido || '';
+
+    const modal = document.createElement('div');
+    modal.className = 'pick-modal-overlay';
+    modal.innerHTML = `<div class="pick-modal"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><strong>Series disponibles</strong><button class="btn-icon" onclick="this.closest('.pick-modal-overlay').remove()">✕</button></div><div class="empty-state" style="padding:20px 0;"><div class="empty-icon">⏳</div>Buscando series…</div></div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+
+    const { data } = await buscarStockAvanzado({ sku: it.sku, paleta: pp, estado: 'DISPONIBLE', limit: 50 });
+    const series = (data || []).filter(r => r.serie && r.serie !== '-' && r.serie !== '');
+
+    const inner = modal.querySelector('.pick-modal');
+    if (!series.length) {
+      inner.innerHTML += '<p style="color:var(--text-tertiary);font-size:12px;">No hay series registradas para este SKU y pedido/paleta.</p>';
+      return;
+    }
+
+    const actualSerie = document.getElementById(`pick-serie-${idx}`)?.value?.trim();
+    inner.querySelector('.empty-state')?.remove();
+
+    const lista = document.createElement('div');
+    lista.innerHTML = `
+      <p style="font-size:11px; color:var(--text-secondary); margin-bottom:8px;">
+        Toca una serie para seleccionarla. Si difiere de la solicitada se pedirá confirmación.
+      </p>
+      ${series.map(r => `
+        <div class="pick-modal-opcion ${r.serie===actualSerie?'recomendada':''}" data-serie="${escapeHtml(r.serie)}" data-sid="${r.id}" data-pp="${escapeHtml(r.paleta_pedido||'')}">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-family:monospace; font-weight:700; font-size:12px;">${escapeHtml(r.serie)}</span>
+            <div style="font-size:11px; color:var(--text-secondary); text-align:right;">
+              ${r.paleta_pedido?`<div>${escapeHtml(r.paleta_pedido)}</div>`:''}
+              ${r.ubicacion_fisica?`<div>${escapeHtml(r.ubicacion_fisica)}</div>`:''}
+            </div>
+          </div>
+        </div>
+      `).join('')}
+    `;
+    inner.appendChild(lista);
+
+    lista.querySelectorAll('.pick-modal-opcion').forEach(el => {
+      el.addEventListener('click', () => {
+        const serie    = el.dataset.serie;
+        const sid      = el.dataset.sid;
+        const pp       = el.dataset.pp;
+        const pedida   = it.serie;
+        if (pedida && serie !== pedida && pedida !== '-') {
+          if (!confirm(`La serie solicitada es "${pedida}" pero seleccionaste "${serie}". ¿Confirmas que es correcta?`)) return;
+        }
+        const serieInp = document.getElementById(`pick-serie-${idx}`);
+        const ppInp    = document.getElementById(`pick-pp-${idx}`);
+        const sidInp   = document.getElementById(`pick-stock-id-${idx}`);
+        if (serieInp) serieInp.value = serie;
+        if (ppInp && pp) ppInp.value = pp;
+        if (sidInp && sid) sidInp.value = sid;
+        modal.remove();
+      });
+    });
   },
 
   _bindPanel(idx) {
