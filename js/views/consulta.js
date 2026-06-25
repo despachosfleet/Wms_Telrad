@@ -44,8 +44,19 @@ const ConsultaView = {
 
   afterRender() {
     this._estadoFiltro=''; this._tipoFiltro=''; this._expandidaFila=null;
+    this._extraVisible = false;
+
     document.getElementById('btn-buscar-stock').addEventListener('click', ()=>this._buscar());
     document.getElementById('btn-limpiar-stock').addEventListener('click', ()=>this._limpiar());
+
+    // Toggle filtros extra
+    document.getElementById('btn-toggle-extra')?.addEventListener('click', () => {
+      this._extraVisible = !this._extraVisible;
+      const extra = document.getElementById('filtros-extra');
+      const btn   = document.getElementById('btn-toggle-extra');
+      if (extra) extra.style.display = this._extraVisible ? '' : 'none';
+      if (btn)   btn.textContent = this._extraVisible ? '− Menos filtros' : '+ Más filtros';
+    });
 
     document.querySelectorAll('[data-est-stock]').forEach(c=>{
       c.addEventListener('click', ()=>{
@@ -75,6 +86,7 @@ const ConsultaView = {
   _limpiar() {
     ['f-sku','f-serie','f-desc','f-paleta','f-ubic'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
     const cl=document.getElementById('f-cliente'); if(cl) cl.value='';
+    const clpc=document.getElementById('f-cliente-pc'); if(clpc) clpc.value='';
     this._estadoFiltro=''; this._tipoFiltro='';
     document.querySelectorAll('[data-est-stock]').forEach((c,i)=>c.classList.toggle('active',i===0));
     document.querySelectorAll('[data-tipo-stock]').forEach((c,i)=>c.classList.toggle('active',i===0));
@@ -92,7 +104,7 @@ const ConsultaView = {
       descripcion: document.getElementById('f-desc')?.value.trim()||'',
       paleta:      document.getElementById('f-paleta')?.value.trim()||'',
       ubic:        document.getElementById('f-ubic')?.value.trim()||'',
-      cliente:     document.getElementById('f-cliente')?.value||'',
+      cliente:     (document.getElementById('f-cliente')?.value || document.getElementById('f-cliente-pc')?.value || ''),
       estado:      this._estadoFiltro,
       tipo:        this._tipoFiltro,
       orden:this._orden, dir:this._dir, limit:300,
