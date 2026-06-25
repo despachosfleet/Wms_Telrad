@@ -136,7 +136,7 @@ main{padding-top:calc(var(--header-h) + var(--nav-h));padding-bottom:32px;min-he
   background:var(--bg-card);
   border:1px solid var(--border);
   border-radius:var(--radius);
-  padding:10px 14px;
+  padding:8px 10px;
   margin-bottom:10px;
   box-shadow:var(--shadow-sm);
   position:sticky;
@@ -149,25 +149,51 @@ main{padding-top:calc(var(--header-h) + var(--nav-h));padding-bottom:32px;min-he
 .filtros-grid{
   display:grid;
   grid-template-columns:1fr 1fr;
-  gap:6px;
-  margin-bottom:8px;
+  gap:5px;
+  margin-bottom:6px;
 }
 .filtros-grid-2{
   display:grid;
-  grid-template-columns:1fr 1fr auto auto;
-  gap:6px;
+  grid-template-columns:1fr 1fr;
+  gap:5px;
   align-items:end;
+  margin-bottom:6px;
 }
 .filtros-barra .field{margin-bottom:0;}
-.filtros-barra .field label{font-size:10px;}
+.filtros-barra .field label{font-size:9px; text-transform:uppercase; letter-spacing:.3px;}
 .filtros-barra .field input,
-.filtros-barra .field select{padding:6px 8px;font-size:12px;}
-.chips-inline{display:flex;gap:5px;flex-wrap:wrap;align-items:center;}
+.filtros-barra .field select{padding:5px 7px;font-size:12px;}
+
+/* Chips en móvil: scroll horizontal, una sola fila */
+.chips-inline{display:flex;gap:4px;align-items:center;overflow-x:auto;scrollbar-width:none;flex-wrap:nowrap;padding-bottom:2px;}
+.chips-inline::-webkit-scrollbar{display:none;}
+.chips-inline .chip{padding:3px 9px;font-size:10px;white-space:nowrap;flex-shrink:0;}
+
+/* Fila de chips en filtros — scroll horizontal en móvil */
+.filtros-chips-row{
+  display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;
+  flex-wrap:nowrap;padding:2px 0 4px;margin-bottom:4px;
+}
+.filtros-chips-row::-webkit-scrollbar{display:none;}
+.filtros-chips-row .chip{white-space:nowrap;flex-shrink:0;padding:3px 10px;font-size:10px;}
+.filtros-chips-row .chips-label{
+  font-size:9px;font-weight:700;color:var(--text-tertiary);
+  text-transform:uppercase;white-space:nowrap;flex-shrink:0;
+  align-self:center;padding-right:2px;
+}
+
+/* Botones de buscar/limpiar siempre en fila */
+.filtros-btn-row{display:flex;gap:6px;align-items:center;flex-wrap:nowrap;}
+.filtros-btn-row .btn-primary{flex-shrink:0;}
+.filtros-btn-row .btn-ghost{flex-shrink:0;}
+
 @media(min-width:640px){
+  .filtros-barra{padding:10px 14px;}
   .filtros-grid{ grid-template-columns:1.5fr 1fr 1.5fr 1fr 1fr; }
   .filtros-grid-2{ grid-template-columns:1fr 1fr auto auto; }
+  .filtros-chips-row{flex-wrap:wrap;}
+  .chips-inline{flex-wrap:wrap;}
 }
-.chips-inline .chip{padding:3px 10px;font-size:10px;}
 
 /* CARDS */
 .card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;box-shadow:var(--shadow-sm);}

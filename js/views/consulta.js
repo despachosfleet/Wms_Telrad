@@ -16,31 +16,26 @@ const ConsultaView = {
           <div class="field"><label>Pedido / Paleta</label><input id="f-paleta" type="text" autocomplete="off"></div>
           <div class="field"><label>Ubicación</label><input id="f-ubic" type="text" autocomplete="off"></div>
         </div>
-        <div class="filtros-grid-2">
-          <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-            <span style="font-size:10px; font-weight:700; color:var(--text-tertiary); text-transform:uppercase; white-space:nowrap;">Estado:</span>
-            <div class="chips-inline" id="chips-estado-stock">
-              ${['','DISPONIBLE','RESERVADO','DESPACHADO','DAÑADO'].map((e,i)=>
-                `<button class="chip ${i===0?'active':''}" data-est-stock="${e}">${i===0?'Todos':e}</button>`
-              ).join('')}
-            </div>
+        <!-- Chips estado — scroll horizontal en móvil -->
+        <div class="filtros-chips-row" id="chips-estado-stock">
+          <span class="chips-label">Estado:</span>
+          ${['','DISPONIBLE','RESERVADO','DESPACHADO','DAÑADO'].map((e,i)=>
+            `<button class="chip ${i===0?'active':''}" data-est-stock="${e}">${i===0?'Todos':e}</button>`
+          ).join('')}
+        </div>
+        <!-- Chips tipo + cliente + botones en fila -->
+        <div style="display:flex; gap:6px; align-items:center; flex-wrap:nowrap; overflow-x:auto; padding-bottom:4px; scrollbar-width:none;">
+          <span style="font-size:9px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;white-space:nowrap;flex-shrink:0;">Tipo:</span>
+          <div class="chips-inline" id="chips-tipo-stock" style="flex-shrink:0;">
+            ${['','MUDANZA','INGRESO NUEVO'].map((t,i)=>
+              `<button class="chip ${i===0?'active':''}" data-tipo-stock="${t}">${i===0?'Todos':t==='INGRESO NUEVO'?'Ing. Nuevo':t}</button>`
+            ).join('')}
           </div>
-          <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-            <span style="font-size:10px; font-weight:700; color:var(--text-tertiary); text-transform:uppercase; white-space:nowrap;">Tipo:</span>
-            <div class="chips-inline" id="chips-tipo-stock">
-              ${['','MUDANZA','INGRESO NUEVO'].map((t,i)=>
-                `<button class="chip ${i===0?'active':''}" data-tipo-stock="${t}">${i===0?'Todos':t}</button>`
-              ).join('')}
-            </div>
-          </div>
-          <div class="field" style="margin-bottom:0;">
-            <label>Cliente</label>
-            <select id="f-cliente"><option value="">Todos</option><option>ENTEL</option><option>CLARO</option><option>TELRAD</option></select>
-          </div>
-          <div style="display:flex; gap:6px; align-items:flex-end;">
-            <button class="btn-primary" id="btn-buscar-stock" style="height:34px; padding:0 16px;">Buscar</button>
-            <button class="btn-ghost"   id="btn-limpiar-stock" style="height:34px;">Limpiar</button>
-          </div>
+          <select id="f-cliente" style="font-size:11px;padding:4px 6px;flex-shrink:0;max-width:100px;">
+            <option value="">Todos</option><option>ENTEL</option><option>CLARO</option><option>TELRAD</option>
+          </select>
+          <button class="btn-primary" id="btn-buscar-stock" style="flex-shrink:0;white-space:nowrap;padding:5px 14px;font-size:12px;">Buscar</button>
+          <button class="btn-ghost"   id="btn-limpiar-stock" style="flex-shrink:0;white-space:nowrap;padding:5px 10px;font-size:12px;">Limpiar</button>
         </div>
       </div>
       <div id="cont-resultado-stock"></div>
