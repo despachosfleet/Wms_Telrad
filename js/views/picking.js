@@ -11,37 +11,34 @@ const PickingListaView = {
 
   render() {
     return `
-      <!-- Dashboard compacto -->
-      <div id="pick-dashboard" class="dashboard-stats" style="margin-bottom:8px;"></div>
-
-      <div class="card" style="padding:10px;">
-        <!-- Fila 1: GR + Destino -->
+      <div id="pick-dashboard" class="dashboard-stats" style="margin-bottom:6px;"></div>
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;padding:8px 10px;">
+        <!-- GR + Destino -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:5px;">
           <div class="field"><label>N° GR</label><input type="text" id="pick-f-gr" autocomplete="off"></div>
           <div class="field"><label>Destino</label><input type="text" id="pick-f-destino" autocomplete="off"></div>
         </div>
-        <!-- Fila 2: Cliente + Fechas + Botones en una línea -->
-        <div style="display:flex;gap:5px;align-items:flex-end;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-bottom:8px;">
-          <div class="field" style="min-width:80px;flex-shrink:0;">
+        <!-- Cliente + Fechas + Botones en fila scrollable -->
+        <div style="display:flex;gap:4px;align-items:flex-end;overflow-x:auto;scrollbar-width:none;margin-bottom:6px;flex-wrap:nowrap;">
+          <div class="field" style="flex-shrink:0;min-width:75px;margin-bottom:0;">
             <label>Cliente</label>
-            <select id="pick-f-cliente" style="font-size:11px;padding:4px 4px;">
-              <option value="">Todos</option>
-              <option>ENTEL</option><option>CLARO</option><option>TELRAD</option>
+            <select id="pick-f-cliente" style="font-size:11px;padding:3px 4px;">
+              <option value="">Todos</option><option>ENTEL</option><option>CLARO</option><option>TELRAD</option>
             </select>
           </div>
-          <div class="field" style="min-width:100px;flex-shrink:0;">
+          <div class="field" style="flex-shrink:0;margin-bottom:0;">
             <label>Desde</label>
-            <input type="date" id="pick-desde" style="font-size:11px;padding:4px;">
+            <input type="date" id="pick-desde" style="font-size:11px;padding:3px 4px;width:120px;">
           </div>
-          <div class="field" style="min-width:100px;flex-shrink:0;">
+          <div class="field" style="flex-shrink:0;margin-bottom:0;">
             <label>Hasta</label>
-            <input type="date" id="pick-hasta" style="font-size:11px;padding:4px;">
+            <input type="date" id="pick-hasta" style="font-size:11px;padding:3px 4px;width:120px;">
           </div>
-          <button class="btn-primary" id="pick-btn-buscar" style="flex-shrink:0;padding:5px 12px;font-size:12px;white-space:nowrap;">Buscar</button>
-          <button class="btn-ghost"   id="pick-btn-limpiar" style="flex-shrink:0;padding:5px 8px;font-size:12px;">✕</button>
+          <button class="btn-primary" id="pick-btn-buscar" style="flex-shrink:0;padding:5px 12px;font-size:12px;white-space:nowrap;align-self:flex-end;">Buscar</button>
+          <button class="btn-ghost"   id="pick-btn-limpiar" style="flex-shrink:0;padding:5px 7px;font-size:12px;align-self:flex-end;">✕</button>
         </div>
-        <!-- Chips estado en scroll -->
-        <div id="chips-estado-pick" style="display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;flex-wrap:nowrap;padding-bottom:2px;"></div>
+        <!-- Chips estado -->
+        <div id="chips-estado-pick" style="display:flex;gap:3px;overflow-x:auto;scrollbar-width:none;flex-wrap:nowrap;"></div>
       </div>
       <div id="lista-pick-cont"></div>
     `;
@@ -698,33 +695,31 @@ const DespachosSalidasView = {
 
   render() {
     return `
-      <div id="ds-dashboard" class="dashboard-stats" style="margin-bottom:8px;"></div>
-
-      <div class="card" style="padding:10px;">
+      <div id="ds-dashboard" class="dashboard-stats" style="margin-bottom:6px;"></div>
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;padding:8px 10px;">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:5px;">
           <div class="field"><label>N° GR</label><input type="text" id="ds-f-gr" autocomplete="off"></div>
           <div class="field"><label>Destino</label><input type="text" id="ds-f-destino" autocomplete="off"></div>
         </div>
-        <div style="display:flex;gap:5px;align-items:flex-end;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-bottom:8px;">
-          <div class="field" style="min-width:80px;flex-shrink:0;">
+        <div style="display:flex;gap:4px;align-items:flex-end;overflow-x:auto;scrollbar-width:none;margin-bottom:6px;flex-wrap:nowrap;">
+          <div class="field" style="flex-shrink:0;min-width:75px;margin-bottom:0;">
             <label>Cliente</label>
-            <select id="ds-f-cliente" style="font-size:11px;padding:4px 4px;">
-              <option value="">Todos</option>
-              <option>ENTEL</option><option>CLARO</option><option>TELRAD</option>
+            <select id="ds-f-cliente" style="font-size:11px;padding:3px 4px;">
+              <option value="">Todos</option><option>ENTEL</option><option>CLARO</option><option>TELRAD</option>
             </select>
           </div>
-          <div class="field" style="min-width:100px;flex-shrink:0;">
+          <div class="field" style="flex-shrink:0;margin-bottom:0;">
             <label>Desde</label>
-            <input type="date" id="ds-desde" style="font-size:11px;padding:4px;">
+            <input type="date" id="ds-desde" style="font-size:11px;padding:3px 4px;width:120px;">
           </div>
-          <div class="field" style="min-width:100px;flex-shrink:0;">
+          <div class="field" style="flex-shrink:0;margin-bottom:0;">
             <label>Hasta</label>
-            <input type="date" id="ds-hasta" style="font-size:11px;padding:4px;">
+            <input type="date" id="ds-hasta" style="font-size:11px;padding:3px 4px;width:120px;">
           </div>
-          <button class="btn-primary" id="ds-btn-buscar" style="flex-shrink:0;padding:5px 12px;font-size:12px;white-space:nowrap;">Buscar</button>
-          <button class="btn-ghost"   id="ds-btn-limpiar" style="flex-shrink:0;padding:5px 8px;font-size:12px;">✕</button>
+          <button class="btn-primary" id="ds-btn-buscar" style="flex-shrink:0;padding:5px 12px;font-size:12px;white-space:nowrap;align-self:flex-end;">Buscar</button>
+          <button class="btn-ghost"   id="ds-btn-limpiar" style="flex-shrink:0;padding:5px 7px;font-size:12px;align-self:flex-end;">✕</button>
         </div>
-        <div id="chips-ds" style="display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;flex-wrap:nowrap;padding-bottom:2px;"></div>
+        <div id="chips-ds" style="display:flex;gap:3px;overflow-x:auto;scrollbar-width:none;flex-wrap:nowrap;"></div>
       </div>
       <div id="lista-ds"></div>
     `;

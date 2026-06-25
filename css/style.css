@@ -475,36 +475,34 @@ main{padding-top:calc(var(--header-h) + var(--nav-h));padding-bottom:32px;min-he
   padding: 0 0 32px;
 }
 .mobile-menu-header {
-  background: var(--bg);
-  padding: 16px 14px 10px;
+  background: var(--bg-header);
+  padding: 12px 14px;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid var(--border);
 }
 .mm-brand {
-  font-size: 18px; font-weight: 900;
-  color: var(--accent); letter-spacing: -0.5px;
+  font-size: 15px; font-weight: 900;
+  color: #fff; letter-spacing: -0.3px;
   line-height: 1;
-  margin-bottom: 4px;
 }
 .mm-saludo {
-  font-size: 11px; color: var(--text-tertiary);
-  text-transform: capitalize;
+  font-size: 10px; color: rgba(255,255,255,.6);
+  text-transform: capitalize; margin-top: 2px;
   transition: opacity .8s;
 }
 .mm-logout-btn {
-  background: var(--bg-row-alt);
-  border: 1px solid var(--border-strong);
+  background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.2);
   border-radius: var(--radius-sm);
-  color: var(--text-secondary);
+  color: #fff;
   cursor: pointer;
-  padding: 6px 10px;
+  padding: 5px 10px;
   display: flex; align-items: center; gap: 5px;
-  font-size: 12px; font-weight: 600;
+  font-size: 11px; font-weight: 600;
   transition: background .15s;
 }
-.mm-logout-btn:hover { background: var(--danger-bg); color: var(--danger-text); }
+.mm-logout-btn:hover { background: rgba(255,255,255,.25); }
 .mm-logout-btn svg { fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0; }
 
 .mobile-dash {
