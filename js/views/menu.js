@@ -117,13 +117,22 @@ const MenuView = {
 
   render() {
     return `
+      <!-- Stats de órdenes -->
       <div id="dash-stats" class="dashboard-stats">
-        ${['Órdenes activas','Por validar','Por recibir','Alertas stock'].map((l,i) => `
+        ${['Órdenes activas','Por validar','Por recibir','Alertas stock'].map(l => `
           <div class="stat-card">
             <div class="stat-value stat-loading">…</div>
             <div class="stat-label">${l}</div>
           </div>
         `).join('')}
+      </div>
+
+      <!-- Stock por origen -->
+      <p class="section-label">Stock disponible</p>
+      <div id="dash-stock" style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px;">
+        <div class="stat-card" style="grid-column:1/-1;">
+          <div class="stat-value stat-loading" style="font-size:14px;">Cargando…</div>
+        </div>
       </div>
 
       <p class="section-label">Accesos rápidos</p>
@@ -146,7 +155,7 @@ const MenuView = {
         </button>
         <button class="menu-item" data-nav="recepcion">
           <div class="mi-icon">📥</div>
-          <span>Recepción</span><small>Subir Excel de ingresos</small>
+          <span>Recepción</span><small>Registrar ingresos</small>
         </button>
         <button class="menu-item" data-nav="movimientos">
           <div class="mi-icon">🔄</div>
@@ -174,25 +183,86 @@ const MenuView = {
 
   async _cargarStats() {
     try {
-      const [despachos, borradores, recepciones] = await Promise.all([
+      const [despachos, borradores, resumenStock] = await Promise.all([
         obtenerTodosLosDespachos({}).catch(() => []),
         obtenerOrdenesBorrador().catch(() => []),
-        obtenerRecepcionesPendientes().catch(() => []),
+        obtenerResumenStock().catch(() => null),
       ]);
+
+      // Stats de órdenes
       const activas = despachos.filter(d => {
         const e = calcularEstadoVisual(d);
         return e === 'PENDIENTE' || e === 'EN_PROCESO';
       }).length;
-      const cont = document.getElementById('dash-stats');
-      if (!cont) return;
-      const vals  = [activas, borradores.length, recepciones.length, 0];
-      const labels = ['Órdenes activas','Por validar','Por recibir','Alertas stock'];
-      cont.innerHTML = vals.map((v, i) => `
-        <div class="stat-card">
-          <div class="stat-value">${v}</div>
-          <div class="stat-label">${labels[i]}</div>
-        </div>
-      `).join('');
+      const statsCont = document.getElementById('dash-stats');
+      if (statsCont) {
+        const vals   = [activas, borradores.length, 0, 0];
+        const labels = ['Órdenes activas','Por validar','Por recibir','Alertas stock'];
+        statsCont.innerHTML = vals.map((v, i) => `
+          <div class="stat-card">
+            <div class="stat-value">${v}</div>
+            <div class="stat-label">${labels[i]}</div>
+          </div>
+        `).join('');
+      }
+
+      // Stock por origen y cliente
+      const stockCont = document.getElementById('dash-stock');
+      if (stockCont && resumenStock) {
+        const m  = resumenStock.mudanza;
+        const in_ = resumenStock.ingresoNuevo;
+        stockCont.innerHTML = `
+          <!-- Mudanza -->
+          <div class="card" style="margin:0; padding:12px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+              <span style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-tertiary);">Mudanza</span>
+              <span class="pill pill-info" style="font-size:11px;">${m.total} ítems</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:4px;">
+              ${[['ENTEL',m.entel],['CLARO',m.claro],['TELRAD',m.telrad]].map(([c,n])=>`
+                <div style="display:flex; justify-content:space-between; font-size:12px;">
+                  <span style="color:var(--text-secondary);">${c}</span>
+                  <strong>${n}</strong>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
+          <!-- Ingreso nuevo -->
+          <div class="card" style="margin:0; padding:12px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+              <span style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-tertiary);">Ingreso nuevo</span>
+              <span class="pill pill-success" style="font-size:11px;">${in_.total} ítems</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:4px;">
+              ${[['ENTEL',in_.entel],['CLARO',in_.claro],['TELRAD',in_.telrad]].map(([c,n])=>`
+                <div style="display:flex; justify-content:space-between; font-size:12px;">
+                  <span style="color:var(--text-secondary);">${c}</span>
+                  <strong>${n}</strong>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
+          <!-- Totales -->
+          <div class="card" style="margin:0; padding:12px; grid-column:1/-1;">
+            <div style="display:flex; gap:16px; flex-wrap:wrap; justify-content:space-around; text-align:center;">
+              <div>
+                <div style="font-size:22px; font-weight:900; color:var(--accent);">${resumenStock.totalDisponible}</div>
+                <div style="font-size:11px; color:var(--text-tertiary);">Disponible</div>
+              </div>
+              <div>
+                <div style="font-size:22px; font-weight:900; color:var(--warning);">${resumenStock.totalReservado}</div>
+                <div style="font-size:11px; color:var(--text-tertiary);">Reservado</div>
+              </div>
+              <div>
+                <div style="font-size:22px; font-weight:900; color:var(--text);">${resumenStock.totalDisponible + resumenStock.totalReservado}</div>
+                <div style="font-size:11px; color:var(--text-tertiary);">Total en almacén</div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
     } catch(e) { console.error('Dashboard error:', e); }
   }
 };

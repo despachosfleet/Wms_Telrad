@@ -64,6 +64,21 @@ const Router = {
   },
 
   _navigatePC(name, params, view) {
+    // El menú/dashboard nunca abre como pestaña — es la pantalla base
+    if (name === 'menu') {
+      this._tabs = [];
+      this._activeTab = null;
+      this.currentView = 'menu';
+      this.currentParams = {};
+      this._renderTabs();
+      const titleEl = document.getElementById('page-title');
+      if (titleEl) titleEl.textContent = view.title || 'Inicio';
+      const main = document.getElementById('main-content');
+      main.innerHTML = `<div class="page-inner">${view.render ? view.render(params) : ''}</div>`;
+      if (view.afterRender) view.afterRender(params);
+      return;
+    }
+
     // Si ya existe una pestaña para esta vista con los mismos params, activarla
     const key = name + JSON.stringify(params);
     const existing = this._tabs.find(t => t.key === key);

@@ -77,6 +77,42 @@ async function contarStock() {
   return count;
 }
 
+async function obtenerResumenStock() {
+  // Trae conteos agrupados por tipo y cliente en una sola consulta
+  const { data, error } = await sb
+    .from('stock')
+    .select('tipo, cliente, estado')
+    .in('estado', ['DISPONIBLE', 'RESERVADO']);
+  if (error || !data) return null;
+
+  const res = {
+    mudanza:      { total: 0, entel: 0, claro: 0, telrad: 0 },
+    ingresoNuevo: { total: 0, entel: 0, claro: 0, telrad: 0 },
+    totalDisponible: 0,
+    totalReservado:  0,
+  };
+
+  data.forEach(r => {
+    const tipo    = (r.tipo    || '').toUpperCase();
+    const cliente = (r.cliente || '').toUpperCase();
+    const estado  = (r.estado  || '').toUpperCase();
+
+    if (estado === 'DISPONIBLE') res.totalDisponible++;
+    if (estado === 'RESERVADO')  res.totalReservado++;
+
+    const bucket = tipo === 'MUDANZA' ? res.mudanza
+                 : tipo === 'INGRESO NUEVO' ? res.ingresoNuevo
+                 : null;
+    if (!bucket) return;
+    bucket.total++;
+    if (cliente === 'ENTEL')  bucket.entel++;
+    else if (cliente === 'CLARO')  bucket.claro++;
+    else if (cliente === 'TELRAD') bucket.telrad++;
+  });
+
+  return res;
+}
+
 async function obtenerSugerencias(texto) {
   if (!texto || texto.length < 2) return [];
   const t = texto.trim();

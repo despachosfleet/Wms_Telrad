@@ -302,7 +302,7 @@ const RecepcionView = {
             <input type="text" id="lpn-pedido">
           </div>
           <div class="field">
-            <label>Tipo ingreso</label>
+            <label>Condición</label>
             <select id="lpn-tipo">
               <option value="NUEVO">NUEVO</option>
               <option value="DESMONTADO">DESMONTADO</option>
@@ -408,7 +408,7 @@ const RecepcionView = {
         CANTIDAD_RECIBIDA: cantidad,
         N_PEDIDO: pedido || '',
         CLIENTE: this._lpnActual.cliente || '',
-        TIPO_INGRESO: tipo,
+        CONDICION: tipo,
         OBSERVACIONES: obs || '',
         FECHA: new Date().toLocaleDateString('es-PE')
       });
@@ -475,7 +475,7 @@ const RecepcionView = {
                 </td>
                 <td style="font-weight:700; color:var(--accent);">${formatNum(it.CANTIDAD_RECIBIDA)}</td>
                 <td style="font-size:11px;">${escapeHtml(it.N_PEDIDO) || '—'}</td>
-                <td><span class="pill pill-neutral" style="font-size:10px;">${escapeHtml(it.TIPO_INGRESO)}</span></td>
+                <td><span class="pill pill-neutral" style="font-size:10px;">${escapeHtml(it.CONDICION)}</span></td>
                 <td>
                   <button class="btn-icon" style="color:var(--danger);" onclick="RecepcionView._eliminarItemLPN(${i})" title="Eliminar">
                     <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
@@ -555,7 +555,7 @@ const RecepcionView = {
                 ['6','SERIE','Serie del artículo (o "-" si no tiene)','024QLM10R8103263'],
                 ['7','CANTIDAD_RECIBIDA','Cantidad recibida real','1'],
                 ['8','N_GUIA','Número de guía de ingreso','T217-00042276'],
-                ['9','TIPO_INGRESO','NUEVO, DESMONTADO, TRASPASO, CONTRATA, DEVOLUCION','NUEVO'],
+                ['9','CONDICION','NUEVO, DESMONTADO, TRASPASO, CONTRATA, DEVOLUCION','NUEVO'],
                 ['10','OBSERVACIONES','Notas adicionales (puede quedar vacío)',''],
               ].map(([n,col,desc,ej]) => `
                 <tr>
@@ -628,7 +628,7 @@ const RecepcionView = {
           SERIE:             String(r[5] || '').trim(),
           CANTIDAD_RECIBIDA: Number(r[6]) || 0,
           N_GUIA:            String(r[7] || '').trim(),
-          TIPO_INGRESO:      String(r[8] || 'NUEVO').trim().toUpperCase() || 'NUEVO',
+          CONDICION:      String(r[8] || 'NUEVO').trim().toUpperCase() || 'NUEVO',
           OBSERVACIONES:     String(r[9] || '').trim(),
         }))
         .filter(r => r.MATERIAL && r.CANTIDAD_RECIBIDA > 0);
@@ -668,7 +668,7 @@ const RecepcionView = {
                 <td class="serie-cell" style="font-size:10px;">
                   ${r.SERIE && !r.SERIE.startsWith('-') ? escapeHtml(r.SERIE) : '<span style="color:var(--text-tertiary);">Sin serie</span>'}
                 </td>
-                <td><span class="pill pill-neutral" style="font-size:10px;">${escapeHtml(r.TIPO_INGRESO)}</span></td>
+                <td><span class="pill pill-neutral" style="font-size:10px;">${escapeHtml(r.CONDICION)}</span></td>
                 <td style="font-size:11px;">${escapeHtml(r.CLIENTE)}</td>
               </tr>
             `).join('')}
@@ -776,7 +776,7 @@ const RecepcionView = {
             <input type="number" id="man-cantidad" value="1" min="1">
           </div>
           <div class="field">
-            <label>Tipo ingreso</label>
+            <label>Condición</label>
             <select id="man-tipo">
               <option value="NUEVO">NUEVO</option>
               <option value="DESMONTADO">DESMONTADO</option>
@@ -854,7 +854,7 @@ const RecepcionView = {
         SERIE:             document.getElementById('man-serie')?.value?.trim() || '-',
         CANTIDAD_RECIBIDA: cantidad,
         N_GUIA:            document.getElementById('man-nguia')?.value?.trim() || '',
-        TIPO_INGRESO:      document.getElementById('man-tipo')?.value || 'NUEVO',
+        CONDICION:      document.getElementById('man-tipo')?.value || 'NUEVO',
         OBSERVACIONES:     document.getElementById('man-obs')?.value?.trim() || '',
       });
 
@@ -911,7 +911,7 @@ const RecepcionView = {
                 </td>
                 <td style="font-weight:700;color:var(--accent);">${formatNum(it.CANTIDAD_RECIBIDA)}</td>
                 <td style="font-size:11px;">${escapeHtml(it.N_PEDIDO) || '—'}</td>
-                <td><span class="pill pill-neutral" style="font-size:10px;">${escapeHtml(it.TIPO_INGRESO)}</span></td>
+                <td><span class="pill pill-neutral" style="font-size:10px;">${escapeHtml(it.CONDICION)}</span></td>
                 <td>
                   <button class="btn-icon" style="color:var(--danger);" onclick="RecepcionView._eliminarItemManual(${i})" title="Eliminar">
                     <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
