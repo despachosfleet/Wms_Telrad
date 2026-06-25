@@ -14,13 +14,24 @@ const PickingListaView = {
     return `
       <div class="card">
         <div class="chips" id="chips-estado-pick" style="margin-bottom:6px;"></div>
-        <div class="chips" id="chips-fecha-pick"></div>
+        <div class="chips" id="chips-fecha-pick" style="margin-bottom:10px;"></div>
+        <div class="filtros-grid" style="margin-bottom:8px;">
+          <div class="field"><label>Buscar GR / Destino</label><input type="text" id="pick-buscar-gr" autocomplete="off" placeholder=""></div>
+          <div class="field"><label>Fecha desde</label><input type="date" id="pick-desde"></div>
+          <div class="field"><label>Fecha hasta</label><input type="date" id="pick-hasta"></div>
+        </div>
       </div>
       <div id="lista-pick-cont"></div>
     `;
   },
 
-  afterRender() { this._renderChips(); this._cargar(); },
+  afterRender() {
+    this._renderChips();
+    this._cargar();
+    document.getElementById('pick-buscar-gr')?.addEventListener('input', ()=>this._renderLista());
+    document.getElementById('pick-desde')?.addEventListener('change', ()=>this._cargar());
+    document.getElementById('pick-hasta')?.addEventListener('change', ()=>this._cargar());
+  },
 
   _renderChips() {
     const estados = [{v:'TODOS',l:'Todos'},{v:'PENDIENTE',l:'Pendiente'},{v:'EN_PROCESO',l:'En proceso'},{v:'PICKEADO',l:'Pickeado'},{v:'DESPACHADO',l:'Despachado'}];
@@ -42,7 +53,12 @@ const PickingListaView = {
   async _cargar() {
     document.getElementById('lista-pick-cont').innerHTML='<div class="empty-state"><div class="empty-icon">⏳</div>Cargando…</div>';
     const hoy=new Date(); let desde=null, hasta=null;
-    if (this._filtroFecha==='HOY') {
+    const desdeManual = document.getElementById('pick-desde')?.value;
+    const hastaManual = document.getElementById('pick-hasta')?.value;
+    if (desdeManual || hastaManual) {
+      desde = desdeManual ? desdeManual+'T00:00:00' : null;
+      hasta = hastaManual ? hastaManual+'T23:59:59' : null;
+    } else if (this._filtroFecha==='HOY') {
       desde=new Date(hoy.getFullYear(),hoy.getMonth(),hoy.getDate()).toISOString();
       hasta=new Date(hoy.getFullYear(),hoy.getMonth(),hoy.getDate()+1).toISOString();
     } else if (this._filtroFecha==='AYER') {
@@ -55,10 +71,16 @@ const PickingListaView = {
 
   _renderLista() {
     const cont = document.getElementById('lista-pick-cont');
+    const buscarGR = (document.getElementById('pick-buscar-gr')?.value||'').trim().toLowerCase();
     let lista = this._despachos
       .filter(d => d.status !== 'BORRADOR')
       .map(d => ({...d, _est: calcularEstadoVisual(d)}));
     if (this._filtroEstado !== 'TODOS') lista = lista.filter(d => d._est===this._filtroEstado);
+    if (buscarGR) lista = lista.filter(d =>
+      (d.gr||'').toLowerCase().includes(buscarGR) ||
+      (d.destino||'').toLowerCase().includes(buscarGR) ||
+      (d.razon_social||'').toLowerCase().includes(buscarGR)
+    );
     if (!lista.length) {
       cont.innerHTML=`<div class="empty-state"><div class="empty-icon">📋</div><strong>Sin órdenes</strong>Cambia los filtros.</div>`;
       return;
@@ -153,7 +175,7 @@ const PickingView = {
               <span style="margin-right:12px;"><span style="opacity:.7;">Destino:</span> <strong>${escapeHtml(this._despacho.destino||'-')}</strong></span>
               ${this._despacho.razon_social?`<span style="margin-right:12px;"><span style="opacity:.7;">Destinatario:</span> <strong>${escapeHtml(this._despacho.razon_social)}</strong></span>`:''}
               ${this._despacho.cliente?`<span style="margin-right:12px;"><span style="opacity:.7;">Cliente:</span> <strong>${escapeHtml(this._despacho.cliente)}</strong></span>`:''}
-              ${this._despacho.contrata?`<span><span style="opacity:.7;">Contrata:</span> <strong>${escapeHtml(this._despacho.contrata)}</strong></span>`:''}
+
             </div>
           </div>
           <div style="text-align:right; flex-shrink:0;">
