@@ -11,9 +11,8 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // FUNCIONES DE ACCESO A DATOS - STOCK
 // ============================================================
 
-async function buscarStockAvanzado({ sku = '', serie = '', ubic = '', paleta = '', cliente = '', estado = '', descripcion = '', textoLibre = '', orden = 'id', dir = 'asc', limit = 200 } = {}) {
+async function buscarStockAvanzado({ sku = '', serie = '', ubic = '', paleta = '', cliente = '', estado = '', tipo = '', descripcion = '', textoLibre = '', orden = 'id', dir = 'asc', limit = 200 } = {}) {
   let query = sb.from('stock').select('*');
-  // Filtros individuales (AND entre si)
   if (sku)         query = query.ilike('sku',             '%' + sku.trim() + '%');
   if (serie)       query = query.ilike('serie',           '%' + serie.trim() + '%');
   if (ubic)        query = query.ilike('ubicacion_fisica','%' + ubic.trim() + '%');
@@ -21,7 +20,7 @@ async function buscarStockAvanzado({ sku = '', serie = '', ubic = '', paleta = '
   if (descripcion) query = query.ilike('descripcion',     '%' + descripcion.trim() + '%');
   if (cliente)     query = query.eq('cliente', cliente);
   if (estado)      query = query.eq('estado',  estado);
-  // Busqueda libre: OR en todos los campos de texto
+  if (tipo)        query = query.eq('tipo',    tipo);
   if (textoLibre) {
     const t = textoLibre.trim();
     query = query.or('sku.ilike.%' + t + '%,serie.ilike.%' + t + '%,descripcion.ilike.%' + t + '%,paleta_pedido.ilike.%' + t + '%,ubicacion_fisica.ilike.%' + t + '%');
@@ -29,6 +28,32 @@ async function buscarStockAvanzado({ sku = '', serie = '', ubic = '', paleta = '
   query = query.order(orden, { ascending: dir === 'asc' }).limit(limit);
   const { data, error } = await query;
   if (error) { console.error('buscarStockAvanzado:', error); return { data: [], error }; }
+
+  // Enriquecer con ubicación desde paletas_ubicacion para ítems sin ubicacion_fisica
+  const sinUbic = (data || []).filter(r => !r.ubicacion_fisica && r.paleta_pedido);
+  if (sinUbic.length) {
+    const paletas = [...new Set(sinUbic.map(r => r.paleta_pedido))];
+    const { data: ubicData } = await sb
+      .from('paletas_ubicacion')
+      .select('paleta, ubicacion_id, ubicaciones(codigo)')
+      .in('paleta', paletas);
+    if (ubicData) {
+      const mapaUbic = {};
+      ubicData.forEach(u => {
+        const codigo = u.ubicaciones?.codigo || '';
+        if (codigo) {
+          if (!mapaUbic[u.paleta]) mapaUbic[u.paleta] = [];
+          if (!mapaUbic[u.paleta].includes(codigo)) mapaUbic[u.paleta].push(codigo);
+        }
+      });
+      data.forEach(r => {
+        if (!r.ubicacion_fisica && r.paleta_pedido && mapaUbic[r.paleta_pedido]) {
+          r.ubicacion_fisica = mapaUbic[r.paleta_pedido].join(', ');
+        }
+      });
+    }
+  }
+
   return { data, error: null };
 }
 
