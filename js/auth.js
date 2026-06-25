@@ -40,11 +40,24 @@ const Auth = {
 
   async _cargarPerfil(user) {
     this._usuario = user;
-    const { data } = await sb.from('perfiles').select('*').eq('id', user.id).single();
-    this._perfil = data;
+    // Reintentar hasta 3 veces por si hay delay en RLS
+    for (let i = 0; i < 3; i++) {
+      const { data, error } = await sb.from('perfiles').select('*').eq('id', user.id).single();
+      if (data) { this._perfil = data; return; }
+      if (i < 2) await new Promise(r => setTimeout(r, 500));
+    }
+    // Si no hay perfil, crear uno básico desde los metadatos del usuario
+    console.warn('No se encontró perfil, usando metadatos del usuario');
+    this._perfil = {
+      id:    user.id,
+      email: user.email,
+      nombre: user.user_metadata?.nombre || user.email,
+      rol:   user.user_metadata?.rol || 'admin', // default admin si no hay perfil
+      activo: true
+    };
   },
 
-  esAdmin()    { return this._perfil?.rol === 'admin'; },
+  esAdmin()    { return !this._perfil || this._perfil?.rol === 'admin'; },
   esOperario() { return this._perfil?.rol === 'operario'; },
   nombre()     { return this._perfil?.nombre || this._usuario?.email || 'Usuario'; },
   email()      { return this._usuario?.email || ''; },

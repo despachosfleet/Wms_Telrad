@@ -53,6 +53,7 @@ let _moduloActivo = null;
 let _dropdownAbierto = null;
 
 function renderBarraModulos() {
+  if (window.innerWidth < 640) return; // nunca en móvil
   const nav = document.getElementById('module-nav');
   if (!nav) return;
   nav.innerHTML = MODULOS.map(m => `
@@ -104,6 +105,7 @@ function cerrarDropdown() {
 document.addEventListener('click', cerrarDropdown);
 
 function sincronizarModuloActivo(vista) {
+  if (window.innerWidth < 640) return;
   if (_navMap[vista]) _moduloActivo = _navMap[vista];
   cerrarDropdown();
   renderBarraModulos();
