@@ -89,14 +89,27 @@ function iniciarApp() {
     }
   });
 
-  // Sobrescribir navigate una sola vez con permisos + control de barra móvil
+  // Sobrescribir navigate con permisos + control de UI móvil
   const _navBase = Router.navigate.bind(Router);
   Router.navigate = function(name, params = {}) {
     if (!Auth.puedeAcceder(name)) { console.warn('Acceso denegado:', name); return; }
+    const header  = document.querySelector('.header');
+    const nav     = document.getElementById('module-nav');
+    const tabBar  = document.getElementById('tab-bar');
     if (esMobil() && name === 'menu-mobile') {
+      // En menú móvil: ocultar TODO el header del sistema
+      if (header)  header.style.display  = 'none';
+      if (nav)     nav.style.display     = 'none';
+      if (tabBar)  tabBar.style.display  = 'none';
       document.body.classList.add('is-mobile-menu');
+      // Quitar padding-top que deja el header fijo
+      document.getElementById('main-content').style.paddingTop = '0';
     } else {
+      // En cualquier otro módulo: mostrar header normal
+      if (header)  header.style.display  = '';
+      if (nav)     nav.style.display     = '';
       document.body.classList.remove('is-mobile-menu');
+      document.getElementById('main-content').style.paddingTop = '';
     }
     _navBase(name, params);
   };
