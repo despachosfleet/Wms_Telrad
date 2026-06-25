@@ -98,6 +98,11 @@ const AdminView = {
           <div class="aa-title">Cambiar paleta/pedido de ítem</div>
           <div class="aa-desc">Reasignar un ítem a otra agrupación</div>
         </div>
+        <div class="admin-action-card" onclick="AdminView.abrirModal('renombrar-paleta')">
+          <div class="aa-icon">✏️</div>
+          <div class="aa-title">Renombrar paleta/pedido</div>
+          <div class="aa-desc">Corregir el nombre de un pedido en todos sus ítems a la vez</div>
+        </div>
         <div class="admin-action-card" onclick="AdminView.abrirModal('revertir-recepcion')">
           <div class="aa-icon">↩️</div>
           <div class="aa-title">Revertir recepción</div>
@@ -204,6 +209,10 @@ const AdminView = {
         titulo: '🔄 Cambiar estado de orden',
         body: this._bodyCambiarEstadoOrden()
       },
+      'renombrar-paleta': {
+        titulo: '✏️ Renombrar paleta/pedido masivo',
+        body: this._bodyRenombrarPaleta()
+      },
       'gestionar-condiciones': {
         titulo: '🏷️ Condiciones de ingreso',
         body: this._bodyGestionarCondiciones()
@@ -291,12 +300,35 @@ const AdminView = {
 
   _bodyEditarStock() {
     return `
-      <div class="field">
-        <label>Buscar por SKU, serie o paleta</label>
-        <input id="adm-busq-stock" type="text" autocomplete="off">
+      <p style="font-size:12px; color:var(--text-secondary); margin-bottom:10px;">
+        Busca por uno o más campos. Puedes editar SKU, serie, cantidad, paleta/pedido y ubicación.
+        Si cambias el nombre de paleta/pedido se actualiza <strong>solo ese ítem</strong> —
+        usa <em>Renombrar paleta/pedido masivo</em> para cambiar todos los ítems de una paleta a la vez.
+      </p>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+        <div class="field"><label>SKU</label><input id="adm-busq-sku" type="text" autocomplete="off"></div>
+        <div class="field"><label>Serie</label><input id="adm-busq-serie" type="text" autocomplete="off" style="font-family:monospace;"></div>
+        <div class="field"><label>Descripción</label><input id="adm-busq-desc" type="text" autocomplete="off"></div>
+        <div class="field"><label>Pedido / Paleta</label><input id="adm-busq-paleta" type="text" autocomplete="off"></div>
       </div>
-      <button class="btn-secondary" id="adm-btn-buscar-stock">Buscar</button>
+      <div style="display:flex; gap:6px;">
+        <button class="btn-primary" id="adm-btn-buscar-stock">Buscar</button>
+        <button class="btn-ghost" id="adm-btn-limpiar-busq-stock">Limpiar</button>
+      </div>
       <div id="adm-resultado-stock" style="margin-top:12px;"></div>
+    `;
+  },
+
+  _bodyRenombrarPaleta() {
+    return `
+      <p style="font-size:12px; color:var(--text-secondary); margin-bottom:10px;">
+        Cambia el nombre de paleta/pedido a <strong>todos los ítems</strong> que tengan ese identificador.
+        Útil cuando te equivocaste al escribir un número de pedido.
+      </p>
+      <div class="field"><label>Paleta/Pedido actual (el que está mal)</label><input id="adm-ren-origen" type="text" style="font-family:monospace;"></div>
+      <div class="field"><label>Nombre correcto</label><input id="adm-ren-destino" type="text" style="font-family:monospace;"></div>
+      <button class="btn-secondary" id="adm-btn-preview-ren">Ver ítems afectados</button>
+      <div id="adm-resultado-ren" style="margin-top:10px;"></div>
     `;
   },
 
@@ -426,6 +458,7 @@ const AdminView = {
       case 'cambiar-estado-orden': this._bindCambiarEstadoOrden(); break;
       case 'crear-ubicacion':    this._bindCrearUbicacion(); break;
       case 'mover-masivo':          this._bindMoverMasivo(); break;
+      case 'renombrar-paleta':      this._bindRenombrarPaleta(); break;
       case 'gestionar-condiciones': this._bindGestionarCondiciones(); break;
     }
   },
@@ -517,26 +550,47 @@ const AdminView = {
   },
 
   _bindEditarStock() {
-    document.getElementById('adm-btn-buscar-stock')?.addEventListener('click', async () => {
-      const q = document.getElementById('adm-busq-stock').value.trim();
-      const cont = document.getElementById('adm-resultado-stock');
-      if (!q) return;
+    const buscar = async () => {
+      const sku    = document.getElementById('adm-busq-sku')?.value.trim()    || '';
+      const serie  = document.getElementById('adm-busq-serie')?.value.trim()  || '';
+      const desc   = document.getElementById('adm-busq-desc')?.value.trim()   || '';
+      const paleta = document.getElementById('adm-busq-paleta')?.value.trim() || '';
+      const cont   = document.getElementById('adm-resultado-stock');
+      if (!sku && !serie && !desc && !paleta) {
+        cont.innerHTML = '<div class="alert alert-warning">Ingresa al menos un filtro.</div>'; return;
+      }
       cont.innerHTML = '<p class="msg-warning">Buscando…</p>';
-      const { data } = await buscarStockAvanzado({ textoLibre: q, limit: 30 });
+      const { data } = await buscarStockAvanzado({ sku, serie, descripcion: desc, paleta, limit: 50 });
       if (!data?.length) { cont.innerHTML = '<p class="msg-error">No encontrado.</p>'; return; }
       cont.innerHTML = `
+        <p style="font-size:11px; color:var(--text-tertiary); margin-bottom:6px;">${data.length} ítem${data.length!==1?'s':''} — editables directamente</p>
         <div class="table-wrap">
           <table class="data-table">
-            <thead><tr><th>SKU</th><th>Serie</th><th>Cantidad</th><th>Paleta/Pedido</th><th>Ubicación</th><th></th></tr></thead>
+            <thead><tr>
+              <th>SKU<br><small style="font-weight:400;color:var(--accent);font-size:9px;">editable</small></th>
+              <th>Serie<br><small style="font-weight:400;color:var(--accent);font-size:9px;">editable</small></th>
+              <th>Cant.</th>
+              <th>Paleta/Pedido</th>
+              <th>Ubicación</th>
+              <th></th>
+            </tr></thead>
             <tbody>
               ${data.map(r => `
                 <tr id="adm-row-${r.id}">
-                  <td class="sku-cell">${escapeHtml(r.sku)}</td>
-                  <td style="font-family:monospace; font-size:11px;">${escapeHtml(r.serie||'-')}</td>
+                  <td>
+                    <input type="text" value="${escapeHtml(r.sku||'')}"
+                      id="adm-sku-edit-${r.id}"
+                      style="width:130px; font-family:monospace; font-size:11px; font-weight:700; background:var(--bg-input); border:1px solid var(--accent-dim); border-radius:4px; padding:3px 6px;">
+                  </td>
+                  <td>
+                    <input type="text" value="${escapeHtml(r.serie||'')}"
+                      id="adm-serie-edit-${r.id}"
+                      style="width:130px; font-family:monospace; font-size:10px; background:var(--bg-input); border:1px solid var(--accent-dim); border-radius:4px; padding:3px 6px;">
+                  </td>
                   <td>
                     <input type="number" value="${r.cantidad}" min="0"
                       id="adm-cant-${r.id}"
-                      style="width:70px; text-align:center; background:var(--bg-input); border:1px solid var(--border-strong); border-radius:4px; padding:3px 6px; font-weight:700;">
+                      style="width:65px; text-align:center; background:var(--bg-input); border:1px solid var(--border-strong); border-radius:4px; padding:3px 6px; font-weight:700;">
                   </td>
                   <td>
                     <input type="text" value="${escapeHtml(r.paleta_pedido||'')}"
@@ -546,7 +600,7 @@ const AdminView = {
                   <td>
                     <input type="text" value="${escapeHtml(r.ubicacion_fisica||'')}"
                       id="adm-ubic-${r.id}"
-                      style="width:100px; background:var(--bg-input); border:1px solid var(--border-strong); border-radius:4px; padding:3px 6px; font-size:11px;">
+                      style="width:90px; background:var(--bg-input); border:1px solid var(--border-strong); border-radius:4px; padding:3px 6px; font-size:11px;">
                   </td>
                   <td>
                     <button class="btn-primary" style="padding:5px 10px; font-size:11px;" data-guardar-stock="${r.id}">Guardar</button>
@@ -559,16 +613,83 @@ const AdminView = {
       `;
       cont.querySelectorAll('[data-guardar-stock]').forEach(btn => {
         btn.addEventListener('click', async () => {
-          const id = Number(btn.dataset.guardarStock);
-          const cant  = Number(document.getElementById(`adm-cant-${id}`)?.value);
-          const pp    = document.getElementById(`adm-pp-${id}`)?.value.trim();
-          const ubic  = document.getElementById(`adm-ubic-${id}`)?.value.trim();
+          const id   = Number(btn.dataset.guardarStock);
+          const sku  = document.getElementById(`adm-sku-edit-${id}`)?.value.trim().toUpperCase();
+          const serie= document.getElementById(`adm-serie-edit-${id}`)?.value.trim();
+          const cant = Number(document.getElementById(`adm-cant-${id}`)?.value);
+          const pp   = document.getElementById(`adm-pp-${id}`)?.value.trim();
+          const ubic = document.getElementById(`adm-ubic-${id}`)?.value.trim();
+          if (!sku) { alert('El SKU no puede quedar vacío.'); return; }
           btn.disabled = true; btn.textContent = '…';
-          const { error } = await editarStock(id, { cantidad: cant, paleta_pedido: pp, ubicacion_fisica: ubic });
+          const { error } = await editarStock(id, { sku, serie, cantidad: cant, paleta_pedido: pp, ubicacion_fisica: ubic });
           btn.disabled = false;
           btn.textContent = error ? '❌ Error' : '✓ Guardado';
-          btn.className = error ? 'btn-danger' : 'btn-success';
+          btn.className   = error ? 'btn-danger' : 'btn-success';
         });
+      });
+    };
+
+    document.getElementById('adm-btn-buscar-stock')?.addEventListener('click', buscar);
+    document.getElementById('adm-btn-limpiar-busq-stock')?.addEventListener('click', () => {
+      ['adm-busq-sku','adm-busq-serie','adm-busq-desc','adm-busq-paleta'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.value = '';
+      });
+      const cont = document.getElementById('adm-resultado-stock');
+      if (cont) cont.innerHTML = '';
+    });
+    ['adm-busq-sku','adm-busq-serie','adm-busq-desc','adm-busq-paleta'].forEach(id => {
+      document.getElementById(id)?.addEventListener('keydown', e => { if (e.key === 'Enter') buscar(); });
+    });
+  },
+
+  _bindRenombrarPaleta() {
+    document.getElementById('adm-btn-preview-ren')?.addEventListener('click', async () => {
+      const origen  = document.getElementById('adm-ren-origen')?.value.trim();
+      const destino = document.getElementById('adm-ren-destino')?.value.trim();
+      const cont    = document.getElementById('adm-resultado-ren');
+      if (!origen) { cont.innerHTML = '<p class="msg-error">Ingresa el nombre actual.</p>'; return; }
+      cont.innerHTML = '<p class="msg-warning">Buscando…</p>';
+      const { data } = await buscarStockAvanzado({ paleta: origen, limit: 200 });
+      if (!data?.length) { cont.innerHTML = '<p class="msg-error">No se encontraron ítems con ese nombre.</p>'; return; }
+      cont.innerHTML = `
+        <div class="alert alert-warning" style="margin-bottom:10px;">
+          Se renombrarán <strong>${data.length} ítems</strong> de
+          <code>${escapeHtml(origen)}</code> → <code>${escapeHtml(destino||'?')}</code>
+        </div>
+        <div class="table-wrap" style="margin-bottom:10px;">
+          <table class="data-table">
+            <thead><tr><th>SKU</th><th>Serie</th><th>Cant.</th><th>Ubicación</th></tr></thead>
+            <tbody>
+              ${data.slice(0,10).map(r => `<tr>
+                <td class="sku-cell">${escapeHtml(r.sku)}</td>
+                <td style="font-size:10px; font-family:monospace;">${escapeHtml(r.serie||'-')}</td>
+                <td>${formatNum(r.cantidad)}</td>
+                <td>${escapeHtml(r.ubicacion_fisica||'-')}</td>
+              </tr>`).join('')}
+              ${data.length > 10 ? `<tr><td colspan="4" style="text-align:center;font-size:11px;color:var(--text-tertiary);">… y ${data.length-10} más</td></tr>` : ''}
+            </tbody>
+          </table>
+        </div>
+        <button class="btn-warning" id="adm-btn-confirmar-ren" ${!destino?'disabled':''}>
+          Renombrar ${data.length} ítems ${destino ? '→ ' + escapeHtml(destino) : '(falta el nombre correcto)'}
+        </button>
+        <div id="adm-msg-ren" style="margin-top:8px;"></div>
+      `;
+      document.getElementById('adm-btn-confirmar-ren')?.addEventListener('click', async () => {
+        const dest = document.getElementById('adm-ren-destino')?.value.trim();
+        if (!dest) { alert('Ingresa el nombre correcto.'); return; }
+        if (!confirm(`¿Renombrar "${origen}" → "${dest}" en ${data.length} ítems? Esta acción no se puede deshacer fácilmente.`)) return;
+        const btn = document.getElementById('adm-btn-confirmar-ren');
+        btn.disabled = true; btn.textContent = 'Renombrando…';
+        const { error } = await renombrarPaletaPedido(origen, dest);
+        const msg = document.getElementById('adm-msg-ren');
+        if (error) {
+          msg.innerHTML = `<p class="msg-error">Error: ${escapeHtml(String(error))}</p>`;
+          btn.disabled = false;
+        } else {
+          msg.innerHTML = `<p class="msg-ok">✓ ${data.length} ítems renombrados correctamente.</p>`;
+          btn.textContent = '✓ Listo'; btn.className = 'btn-ghost';
+        }
       });
     });
   },

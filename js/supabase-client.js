@@ -1015,6 +1015,14 @@ async function editarStock(stockId, campos) {
   return { error };
 }
 
+// Renombrar paleta/pedido masivamente en todos los ítems que lo tengan
+async function renombrarPaletaPedido(nombreActual, nombreNuevo) {
+  const { error } = await sb.from('stock')
+    .update({ paleta_pedido: nombreNuevo, actualizado_en: new Date().toISOString() })
+    .eq('paleta_pedido', nombreActual);
+  return { error };
+}
+
 // Ajustar inventario con kardex
 async function ajustarInventario(stockId, nuevaCantidad, motivo, observacion) {
   const { data: row } = await sb.from('stock').select('*').eq('id', stockId).single();
