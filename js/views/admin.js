@@ -209,6 +209,15 @@ const AdminView = {
         titulo: '🔄 Cambiar estado de orden',
         body: this._bodyCambiarEstadoOrden()
       },
+      'desactivar-ubicacion': {
+        titulo: '🔒 Desactivar ubicación',
+        body: this._bodyDesactivarUbicacion()
+      },
+      'editar-kardex': {
+        titulo: '🖊️ Corregir movimiento kardex',
+        size: 'modal-lg',
+        body: this._bodyEditarKardex()
+      },
       'renombrar-paleta': {
         titulo: '✏️ Renombrar paleta/pedido masivo',
         body: this._bodyRenombrarPaleta()
@@ -457,6 +466,8 @@ const AdminView = {
       case 'cambiar-estado-orden': this._bindCambiarEstadoOrden(); break;
       case 'crear-ubicacion':    this._bindCrearUbicacion(); break;
       case 'mover-masivo':          this._bindMoverMasivo(); break;
+      case 'desactivar-ubicacion': this._bindDesactivarUbicacion(); break;
+      case 'editar-kardex':        this._bindEditarKardex(); break;
       case 'renombrar-paleta':      this._bindRenombrarPaleta(); break;
       case 'gestionar-condiciones': this._bindGestionarCondiciones(); break;
     }
@@ -909,6 +920,168 @@ const AdminView = {
       msg.innerHTML = error
         ? `<p class="msg-error">Error: ${escapeHtml(String(error))}</p>`
         : `<p class="msg-ok">✓ Ubicación ${codigo} creada.</p>`;
+    });
+  },
+
+  // ── DESACTIVAR UBICACIÓN ───────────────────────────────────
+  _bodyDesactivarUbicacion() {
+    return `
+      <p style="font-size:12px; color:var(--text-secondary); margin-bottom:10px;">
+        Marca una ubicación como no disponible. Los ítems que ya están ahí no se mueven — 
+        solo se bloquea para nuevas asignaciones.
+      </p>
+      <div class="field"><label>Código de ubicación</label>
+        <input id="adm-ubic-desact" type="text" placeholder="Ej: A-01-01-01" autocomplete="off">
+      </div>
+      <div class="field"><label>Motivo (opcional)</label>
+        <input id="adm-ubic-desact-motivo" type="text">
+      </div>
+      <button class="btn-secondary" id="adm-btn-preview-desact">Ver ubicación</button>
+      <div id="adm-resultado-desact" style="margin-top:10px;"></div>
+    `;
+  },
+
+  _bindDesactivarUbicacion() {
+    document.getElementById('adm-btn-preview-desact')?.addEventListener('click', async () => {
+      const codigo = document.getElementById('adm-ubic-desact')?.value.trim().toUpperCase();
+      const cont   = document.getElementById('adm-resultado-desact');
+      if (!codigo) { cont.innerHTML='<p class="msg-error">Ingresa el código.</p>'; return; }
+      cont.innerHTML = '<p class="msg-warning">Buscando…</p>';
+      const { data } = await buscarStockAvanzado({ ubic: codigo, limit: 50 });
+      const items = data || [];
+      cont.innerHTML = `
+        <div class="alert ${items.length?'alert-warning':'alert-info'}" style="margin-bottom:10px;">
+          ${items.length
+            ? `Esta ubicación tiene <strong>${items.length} ítems</strong>. Se desactivará pero los ítems quedan en su lugar.`
+            : `La ubicación <strong>${escapeHtml(codigo)}</strong> está vacía.`}
+        </div>
+        ${items.length ? `
+          <div class="table-wrap" style="margin-bottom:10px;">
+            <table class="data-table">
+              <thead><tr><th>SKU</th><th>Serie</th><th>Cant.</th><th>Paleta/Pedido</th></tr></thead>
+              <tbody>
+                ${items.slice(0,8).map(r=>`<tr>
+                  <td class="sku-cell">${escapeHtml(r.sku)}</td>
+                  <td style="font-size:10px;font-family:monospace;">${escapeHtml(r.serie||'-')}</td>
+                  <td>${formatNum(r.cantidad)}</td>
+                  <td style="font-size:11px;">${escapeHtml(r.paleta_pedido||'-')}</td>
+                </tr>`).join('')}
+                ${items.length>8?`<tr><td colspan="4" style="text-align:center;font-size:11px;color:var(--text-tertiary);">…y ${items.length-8} más</td></tr>`:''}
+              </tbody>
+            </table>
+          </div>
+        `:''}
+        <button class="btn-warning" id="adm-btn-confirmar-desact">🔒 Desactivar ${escapeHtml(codigo)}</button>
+        <div id="adm-msg-desact" style="margin-top:8px;"></div>
+      `;
+      document.getElementById('adm-btn-confirmar-desact')?.addEventListener('click', async () => {
+        const motivo = document.getElementById('adm-ubic-desact-motivo')?.value.trim();
+        if (!confirm(`¿Desactivar la ubicación "${codigo}"?`)) return;
+        const btn = document.getElementById('adm-btn-confirmar-desact');
+        btn.disabled=true; btn.textContent='Desactivando…';
+        const { error } = await desactivarUbicacion(codigo, motivo);
+        const msg = document.getElementById('adm-msg-desact');
+        if (error) {
+          msg.innerHTML=`<p class="msg-error">Error: ${escapeHtml(String(error))}</p>`;
+          btn.disabled=false;
+        } else {
+          msg.innerHTML=`<p class="msg-ok">✓ Ubicación ${escapeHtml(codigo)} desactivada.</p>`;
+          btn.textContent='✓ Listo'; btn.className='btn-ghost';
+        }
+      });
+    });
+    document.getElementById('adm-ubic-desact')?.addEventListener('keydown', e=>{
+      if(e.key==='Enter') document.getElementById('adm-btn-preview-desact')?.click();
+    });
+  },
+
+  // ── EDITAR KARDEX ──────────────────────────────────────────
+  _bodyEditarKardex() {
+    return `
+      <p style="font-size:12px; color:var(--text-secondary); margin-bottom:10px;">
+        Busca movimientos del kardex para corregir observaciones o anular un registro erróneo.
+      </p>
+      <div class="filtros-grid" style="margin-bottom:8px;">
+        <div class="field"><label>SKU</label><input id="adm-kx-sku" type="text" autocomplete="off"></div>
+        <div class="field"><label>Serie</label><input id="adm-kx-serie" type="text" autocomplete="off" style="font-family:monospace;"></div>
+        <div class="field"><label>Fecha desde</label><input id="adm-kx-desde" type="date"></div>
+        <div class="field"><label>Fecha hasta</label><input id="adm-kx-hasta" type="date"></div>
+      </div>
+      <div style="display:flex; gap:6px; margin-bottom:10px;">
+        <button class="btn-primary" id="adm-btn-buscar-kx-edit">Buscar</button>
+      </div>
+      <div id="adm-resultado-kx-edit"></div>
+    `;
+  },
+
+  _bindEditarKardex() {
+    const buscar = async () => {
+      const sku   = document.getElementById('adm-kx-sku')?.value.trim()   || '';
+      const serie = document.getElementById('adm-kx-serie')?.value.trim() || '';
+      const desde = document.getElementById('adm-kx-desde')?.value        || '';
+      const hasta = document.getElementById('adm-kx-hasta')?.value        || '';
+      const cont  = document.getElementById('adm-resultado-kx-edit');
+      if (!sku && !serie) { cont.innerHTML='<p class="msg-error">Ingresa al menos SKU o serie.</p>'; return; }
+      cont.innerHTML='<p class="msg-warning">Buscando…</p>';
+      let data = await obtenerKardex({ sku, serie, limite: 100 });
+      if (desde) data = data.filter(m=>m.fecha && m.fecha >= desde);
+      if (hasta) data = data.filter(m=>m.fecha && m.fecha <= hasta+'T23:59:59');
+      if (!data.length) { cont.innerHTML='<p class="msg-error">Sin movimientos con esos filtros.</p>'; return; }
+      cont.innerHTML = `
+        <p style="font-size:11px; color:var(--text-tertiary); margin-bottom:6px;">${data.length} movimiento${data.length!==1?'s':''}</p>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Fecha</th><th>SKU</th><th>Tipo</th><th>Cant.</th><th>Observación</th><th></th></tr></thead>
+            <tbody>
+              ${data.map(m=>{
+                const fechaStr = m.fecha ? new Date(m.fecha).toLocaleString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '-';
+                return `<tr id="kx-row-${m.id}">
+                  <td style="font-size:10px; white-space:nowrap;">${fechaStr}</td>
+                  <td class="sku-cell">${escapeHtml(m.sku)}</td>
+                  <td><span class="pill pill-neutral" style="font-size:10px;">${escapeHtml(m.tipo_movimiento||'-')}</span></td>
+                  <td style="font-weight:700;">${formatNum(m.cantidad)}</td>
+                  <td>
+                    <input type="text" id="kx-obs-${m.id}" value="${escapeHtml(m.observaciones||m.referencia||'')}"
+                      style="width:160px; font-size:11px; background:var(--bg-input); border:1px solid var(--border-strong); border-radius:4px; padding:3px 6px;">
+                  </td>
+                  <td style="display:flex; gap:4px;">
+                    <button class="btn-primary" style="font-size:10px; padding:3px 8px;" data-save-kx="${m.id}">Guardar</button>
+                    <button class="btn-danger"  style="font-size:10px; padding:3px 8px;" data-del-kx="${m.id}" title="Anular movimiento">✕</button>
+                  </td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      cont.querySelectorAll('[data-save-kx]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id  = btn.dataset.saveKx;
+          const obs = document.getElementById(`kx-obs-${id}`)?.value.trim();
+          btn.disabled=true; btn.textContent='…';
+          const { error } = await editarMovimientoKardex(id, { observaciones: obs });
+          btn.disabled=false;
+          btn.textContent = error ? '❌' : '✓';
+          btn.className   = error ? 'btn-danger' : 'btn-success';
+        });
+      });
+
+      cont.querySelectorAll('[data-del-kx]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          if (!confirm('¿Anular este movimiento del kardex? Es solo para corrección de errores.')) return;
+          const id = btn.dataset.delKx;
+          btn.disabled=true; btn.textContent='…';
+          const { error } = await eliminarMovimientoKardex(id);
+          if (error) { btn.disabled=false; btn.textContent='✕'; alert('Error al anular.'); }
+          else { document.getElementById(`kx-row-${id}`)?.remove(); }
+        });
+      });
+    };
+
+    document.getElementById('adm-btn-buscar-kx-edit')?.addEventListener('click', buscar);
+    ['adm-kx-sku','adm-kx-serie'].forEach(id=>{
+      document.getElementById(id)?.addEventListener('keydown', e=>{ if(e.key==='Enter') buscar(); });
     });
   },
 

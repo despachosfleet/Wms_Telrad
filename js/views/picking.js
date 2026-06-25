@@ -7,80 +7,118 @@
 const PickingListaView = {
   title: 'Órdenes de picking',
   _filtroEstado: 'PENDIENTE',
-  _filtroFecha: 'TODAS',
   _despachos: [],
 
   render() {
     return `
+      <!-- Dashboard de estados -->
+      <div id="pick-dashboard" class="dashboard-stats" style="margin-bottom:10px;"></div>
+
       <div class="card">
-        <div class="chips" id="chips-estado-pick" style="margin-bottom:6px;"></div>
-        <div class="chips" id="chips-fecha-pick" style="margin-bottom:10px;"></div>
+        <!-- Filtros de búsqueda -->
         <div class="filtros-grid" style="margin-bottom:8px;">
-          <div class="field"><label>Buscar GR / Destino</label><input type="text" id="pick-buscar-gr" autocomplete="off" placeholder=""></div>
+          <div class="field"><label>N° GR</label><input type="text" id="pick-f-gr" autocomplete="off"></div>
+          <div class="field"><label>Destino / Destinatario</label><input type="text" id="pick-f-destino" autocomplete="off"></div>
+          <div class="field"><label>Cliente</label>
+            <select id="pick-f-cliente">
+              <option value="">Todos</option>
+              <option>ENTEL</option><option>CLARO</option><option>TELRAD</option>
+            </select>
+          </div>
           <div class="field"><label>Fecha desde</label><input type="date" id="pick-desde"></div>
           <div class="field"><label>Fecha hasta</label><input type="date" id="pick-hasta"></div>
         </div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
+          <button class="btn-primary" id="pick-btn-buscar">Buscar</button>
+          <button class="btn-ghost"   id="pick-btn-limpiar">Limpiar</button>
+        </div>
+        <!-- Chips de estado -->
+        <div class="chips" id="chips-estado-pick"></div>
       </div>
       <div id="lista-pick-cont"></div>
     `;
   },
 
   afterRender() {
+    // Fecha de hoy por defecto
+    const hoy = new Date().toISOString().slice(0,10);
+    const desdeEl = document.getElementById('pick-desde');
+    const hastaEl = document.getElementById('pick-hasta');
+    if (desdeEl) desdeEl.value = hoy;
+    if (hastaEl) hastaEl.value = hoy;
+
     this._renderChips();
     this._cargar();
-    document.getElementById('pick-buscar-gr')?.addEventListener('input', ()=>this._renderLista());
-    document.getElementById('pick-desde')?.addEventListener('change', ()=>this._cargar());
-    document.getElementById('pick-hasta')?.addEventListener('change', ()=>this._cargar());
+
+    document.getElementById('pick-btn-buscar')?.addEventListener('click', ()=>this._cargar());
+    document.getElementById('pick-btn-limpiar')?.addEventListener('click', ()=>{
+      ['pick-f-gr','pick-f-destino','pick-desde','pick-hasta'].forEach(id=>{
+        const el=document.getElementById(id); if(el) el.value='';
+      });
+      const cl=document.getElementById('pick-f-cliente'); if(cl) cl.value='';
+      this._cargar();
+    });
+    ['pick-f-gr','pick-f-destino'].forEach(id=>{
+      document.getElementById(id)?.addEventListener('keydown', e=>{ if(e.key==='Enter') this._cargar(); });
+    });
+    document.getElementById('pick-f-cliente')?.addEventListener('change', ()=>this._cargar());
   },
 
   _renderChips() {
     const estados = [{v:'TODOS',l:'Todos'},{v:'PENDIENTE',l:'Pendiente'},{v:'EN_PROCESO',l:'En proceso'},{v:'PICKEADO',l:'Pickeado'},{v:'DESPACHADO',l:'Despachado'}];
-    const fechas  = [{v:'TODAS',l:'Todas'},{v:'HOY',l:'Hoy'},{v:'AYER',l:'Ayer'}];
-    document.getElementById('chips-estado-pick').innerHTML = estados.map(e =>
+    const el = document.getElementById('chips-estado-pick');
+    if (!el) return;
+    el.innerHTML = estados.map(e =>
       `<button class="chip ${this._filtroEstado===e.v?'active':''}" data-est="${e.v}">${e.l}</button>`
-    ).join('');
-    document.getElementById('chips-fecha-pick').innerHTML = fechas.map(f =>
-      `<button class="chip ${this._filtroFecha===f.v?'active':''}" data-fec="${f.v}">${f.l}</button>`
     ).join('');
     document.querySelectorAll('[data-est]').forEach(b => b.addEventListener('click', () => {
       this._filtroEstado=b.dataset.est; this._renderChips(); this._renderLista();
-    }));
-    document.querySelectorAll('[data-fec]').forEach(b => b.addEventListener('click', () => {
-      this._filtroFecha=b.dataset.fec; this._renderChips(); this._cargar();
     }));
   },
 
   async _cargar() {
     document.getElementById('lista-pick-cont').innerHTML='<div class="empty-state"><div class="empty-icon">⏳</div>Cargando…</div>';
-    const hoy=new Date(); let desde=null, hasta=null;
-    const desdeManual = document.getElementById('pick-desde')?.value;
-    const hastaManual = document.getElementById('pick-hasta')?.value;
-    if (desdeManual || hastaManual) {
-      desde = desdeManual ? desdeManual+'T00:00:00' : null;
-      hasta = hastaManual ? hastaManual+'T23:59:59' : null;
-    } else if (this._filtroFecha==='HOY') {
-      desde=new Date(hoy.getFullYear(),hoy.getMonth(),hoy.getDate()).toISOString();
-      hasta=new Date(hoy.getFullYear(),hoy.getMonth(),hoy.getDate()+1).toISOString();
-    } else if (this._filtroFecha==='AYER') {
-      desde=new Date(hoy.getFullYear(),hoy.getMonth(),hoy.getDate()-1).toISOString();
-      hasta=new Date(hoy.getFullYear(),hoy.getMonth(),hoy.getDate()).toISOString();
-    }
-    this._despachos = await obtenerTodosLosDespachos({ fechaDesde:desde, fechaHasta:hasta });
+    const desde   = document.getElementById('pick-desde')?.value;
+    const hasta   = document.getElementById('pick-hasta')?.value;
+    this._despachos = await obtenerTodosLosDespachos({
+      fechaDesde: desde ? desde+'T00:00:00' : null,
+      fechaHasta: hasta ? hasta+'T23:59:59' : null,
+    });
+    this._renderDashboard();
     this._renderLista();
   },
 
+  _renderDashboard() {
+    const dash = document.getElementById('pick-dashboard');
+    if (!dash) return;
+    const todos = this._despachos.filter(d=>d.status!=='BORRADOR');
+    const conts = {PENDIENTE:0, EN_PROCESO:0, PICKEADO:0, DESPACHADO:0};
+    todos.forEach(d => { const e=calcularEstadoVisual(d); if(conts[e]!==undefined) conts[e]++; });
+    dash.innerHTML = [
+      {l:'Pendientes',  v:conts.PENDIENTE,  c:'var(--text)'},
+      {l:'En proceso',  v:conts.EN_PROCESO,  c:'var(--warning)'},
+      {l:'Pickeados',   v:conts.PICKEADO,    c:'var(--success-text)'},
+      {l:'Despachados', v:conts.DESPACHADO,  c:'var(--text-tertiary)'},
+    ].map(s=>`
+      <div class="stat-card" style="cursor:pointer;" onclick="PickingListaView._filtroEstado='${s.l==='Pendientes'?'PENDIENTE':s.l==='En proceso'?'EN_PROCESO':s.l==='Pickeados'?'PICKEADO':'DESPACHADO'}'; PickingListaView._renderChips(); PickingListaView._renderLista();">
+        <div class="stat-value" style="color:${s.c}; font-size:24px;">${s.v}</div>
+        <div class="stat-label">${s.l}</div>
+      </div>
+    `).join('');
+  },
+
   _renderLista() {
-    const cont = document.getElementById('lista-pick-cont');
-    const buscarGR = (document.getElementById('pick-buscar-gr')?.value||'').trim().toLowerCase();
+    const cont    = document.getElementById('lista-pick-cont');
+    const fGR     = (document.getElementById('pick-f-gr')?.value||'').trim().toLowerCase();
+    const fDest   = (document.getElementById('pick-f-destino')?.value||'').trim().toLowerCase();
+    const fCliente= (document.getElementById('pick-f-cliente')?.value||'').toUpperCase();
     let lista = this._despachos
       .filter(d => d.status !== 'BORRADOR')
       .map(d => ({...d, _est: calcularEstadoVisual(d)}));
     if (this._filtroEstado !== 'TODOS') lista = lista.filter(d => d._est===this._filtroEstado);
-    if (buscarGR) lista = lista.filter(d =>
-      (d.gr||'').toLowerCase().includes(buscarGR) ||
-      (d.destino||'').toLowerCase().includes(buscarGR) ||
-      (d.razon_social||'').toLowerCase().includes(buscarGR)
-    );
+    if (fGR)      lista = lista.filter(d => (d.gr||'').toLowerCase().includes(fGR));
+    if (fDest)    lista = lista.filter(d => (d.destino||'').toLowerCase().includes(fDest) || (d.razon_social||'').toLowerCase().includes(fDest));
+    if (fCliente) lista = lista.filter(d => (d.cliente||'').toUpperCase()===fCliente);
     if (!lista.length) {
       cont.innerHTML=`<div class="empty-state"><div class="empty-icon">📋</div><strong>Sin órdenes</strong>Cambia los filtros.</div>`;
       return;
@@ -514,36 +552,142 @@ Router.register('picking-detalle', PickingDetalleView);
 
 // ---- DESPACHOS Y SALIDAS ----
 const DespachosSalidasView = {
-  title:'Despachos y salidas', _filtroEstado:'PICKEADO', _despachos:[],
-  render(){return`<div class="card"><div class="chips" id="chips-ds"></div></div><div id="lista-ds"></div>`;},
-  afterRender(){this._renderChips();this._cargar();},
-  _renderChips(){
-    [{v:'TODOS',l:'Todos'},{v:'PICKEADO',l:'Pickeado'},{v:'DESPACHADO',l:'Despachado'}].forEach((e,i)=>{});
-    document.getElementById('chips-ds').innerHTML=[{v:'TODOS',l:'Todos'},{v:'PICKEADO',l:'Pickeado'},{v:'DESPACHADO',l:'Despachado'}].map(e=>
+  title: 'Despachos y salidas',
+  _filtroEstado: 'PICKEADO',
+  _despachos: [],
+
+  render() {
+    return `
+      <!-- Dashboard estados -->
+      <div id="ds-dashboard" class="dashboard-stats" style="margin-bottom:10px;"></div>
+
+      <div class="card">
+        <div class="filtros-grid" style="margin-bottom:8px;">
+          <div class="field"><label>N° GR</label><input type="text" id="ds-f-gr" autocomplete="off"></div>
+          <div class="field"><label>Destino / Destinatario</label><input type="text" id="ds-f-destino" autocomplete="off"></div>
+          <div class="field"><label>Cliente</label>
+            <select id="ds-f-cliente">
+              <option value="">Todos</option>
+              <option>ENTEL</option><option>CLARO</option><option>TELRAD</option>
+            </select>
+          </div>
+          <div class="field"><label>Fecha desde</label><input type="date" id="ds-desde"></div>
+          <div class="field"><label>Fecha hasta</label><input type="date" id="ds-hasta"></div>
+        </div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
+          <button class="btn-primary" id="ds-btn-buscar">Buscar</button>
+          <button class="btn-ghost"   id="ds-btn-limpiar">Limpiar</button>
+        </div>
+        <div class="chips" id="chips-ds"></div>
+      </div>
+      <div id="lista-ds"></div>
+    `;
+  },
+
+  afterRender() {
+    const hoy = new Date().toISOString().slice(0,10);
+    const desdeEl = document.getElementById('ds-desde');
+    const hastaEl = document.getElementById('ds-hasta');
+    if (desdeEl) desdeEl.value = hoy;
+    if (hastaEl) hastaEl.value = hoy;
+
+    this._renderChips();
+    this._cargar();
+
+    document.getElementById('ds-btn-buscar')?.addEventListener('click', ()=>this._cargar());
+    document.getElementById('ds-btn-limpiar')?.addEventListener('click', ()=>{
+      ['ds-f-gr','ds-f-destino','ds-desde','ds-hasta'].forEach(id=>{
+        const el=document.getElementById(id); if(el) el.value='';
+      });
+      const cl=document.getElementById('ds-f-cliente'); if(cl) cl.value='';
+      this._cargar();
+    });
+    ['ds-f-gr','ds-f-destino'].forEach(id=>{
+      document.getElementById(id)?.addEventListener('keydown', e=>{ if(e.key==='Enter') this._cargar(); });
+    });
+    document.getElementById('ds-f-cliente')?.addEventListener('change', ()=>this._cargar());
+  },
+
+  _renderChips() {
+    const el = document.getElementById('chips-ds');
+    if (!el) return;
+    el.innerHTML = [{v:'TODOS',l:'Todos'},{v:'PICKEADO',l:'Pickeado'},{v:'DESPACHADO',l:'Despachado'}].map(e=>
       `<button class="chip ${this._filtroEstado===e.v?'active':''}" data-ds="${e.v}">${e.l}</button>`
     ).join('');
-    document.querySelectorAll('[data-ds]').forEach(b=>b.addEventListener('click',()=>{this._filtroEstado=b.dataset.ds;this._renderChips();this._renderLista();}));
+    document.querySelectorAll('[data-ds]').forEach(b=>b.addEventListener('click',()=>{
+      this._filtroEstado=b.dataset.ds; this._renderChips(); this._renderLista();
+    }));
   },
-  async _cargar(){document.getElementById('lista-ds').innerHTML='<div class="empty-state">Cargando…</div>';this._despachos=await obtenerTodosLosDespachos({});this._renderLista();},
-  _renderLista(){
-    const cont=document.getElementById('lista-ds');
-    let lista=this._despachos.filter(d=>d.status!=='BORRADOR').map(d=>({...d,_est:calcularEstadoVisual(d)}));
-    if(this._filtroEstado!=='TODOS') lista=lista.filter(d=>d._est===this._filtroEstado);
-    if(!lista.length){cont.innerHTML=`<div class="empty-state"><div class="empty-icon">🚛</div><strong>Sin despachos</strong></div>`;return;}
-    cont.innerHTML=`<div class="table-wrap"><table class="data-table">
-      <thead><tr><th>GR</th><th>Destino</th><th>Destinatario</th><th>Cliente</th><th>Estado</th><th></th></tr></thead>
-      <tbody>${lista.map(d=>`<tr>
-        <td class="sku-cell">${escapeHtml(d.gr||'-')}</td>
-        <td>${escapeHtml(d.destino||'-')}</td>
-        <td style="font-size:11px;">${escapeHtml(d.razon_social||'-')}</td>
-        <td>${escapeHtml(d.cliente||'-')}</td>
-        <td>${pillEstado(d._est)}</td>
-        <td>${d._est==='PICKEADO'?`<button class="btn-success" style="padding:5px 10px; font-size:11px;" data-desp="${d.id}">Despachar</button>`:`<button class="btn-ghost" data-ver-ds="${d.id}">Ver</button>`}</td>
-      </tr>`).join('')}</tbody>
-    </table></div>`;
+
+  async _cargar() {
+    document.getElementById('lista-ds').innerHTML='<div class="empty-state"><div class="empty-icon">⏳</div>Cargando…</div>';
+    const desde = document.getElementById('ds-desde')?.value;
+    const hasta = document.getElementById('ds-hasta')?.value;
+    this._despachos = await obtenerTodosLosDespachos({
+      fechaDesde: desde ? desde+'T00:00:00' : null,
+      fechaHasta: hasta ? hasta+'T23:59:59' : null,
+    });
+    this._renderDashboard();
+    this._renderLista();
+  },
+
+  _renderDashboard() {
+    const dash = document.getElementById('ds-dashboard');
+    if (!dash) return;
+    const todos = this._despachos.filter(d=>d.status!=='BORRADOR');
+    const conts = {PICKEADO:0, DESPACHADO:0};
+    todos.forEach(d => { const e=calcularEstadoVisual(d); if(conts[e]!==undefined) conts[e]++; });
+    dash.innerHTML = [
+      {l:'Listos para despachar', v:conts.PICKEADO,   c:'var(--success-text)'},
+      {l:'Despachados',           v:conts.DESPACHADO,  c:'var(--text-tertiary)'},
+      {l:'Total en período',      v:todos.length,      c:'var(--accent)'},
+    ].map(s=>`
+      <div class="stat-card">
+        <div class="stat-value" style="color:${s.c}; font-size:24px;">${s.v}</div>
+        <div class="stat-label">${s.l}</div>
+      </div>
+    `).join('');
+  },
+
+  _renderLista() {
+    const cont    = document.getElementById('lista-ds');
+    const fGR     = (document.getElementById('ds-f-gr')?.value||'').trim().toLowerCase();
+    const fDest   = (document.getElementById('ds-f-destino')?.value||'').trim().toLowerCase();
+    const fCliente= (document.getElementById('ds-f-cliente')?.value||'').toUpperCase();
+    let lista = this._despachos.filter(d=>d.status!=='BORRADOR').map(d=>({...d,_est:calcularEstadoVisual(d)}));
+    if (this._filtroEstado!=='TODOS') lista=lista.filter(d=>d._est===this._filtroEstado);
+    if (fGR)      lista=lista.filter(d=>(d.gr||'').toLowerCase().includes(fGR));
+    if (fDest)    lista=lista.filter(d=>(d.destino||'').toLowerCase().includes(fDest)||(d.razon_social||'').toLowerCase().includes(fDest));
+    if (fCliente) lista=lista.filter(d=>(d.cliente||'').toUpperCase()===fCliente);
+
+    if (!lista.length) {
+      cont.innerHTML=`<div class="empty-state"><div class="empty-icon">🚛</div><strong>Sin despachos en este período</strong></div>`;
+      return;
+    }
+    cont.innerHTML=`
+      <p style="font-size:11px; color:var(--text-tertiary); margin-bottom:6px;">${lista.length} despacho${lista.length!==1?'s':''}</p>
+      <div class="table-wrap"><table class="data-table">
+        <thead><tr><th>GR</th><th>Destino</th><th>Destinatario</th><th>Cliente</th><th>Estado</th><th></th></tr></thead>
+        <tbody>${lista.map(d=>`<tr>
+          <td class="sku-cell">${escapeHtml(d.gr||'-')}</td>
+          <td>${escapeHtml(d.destino||'-')}</td>
+          <td style="font-size:11px;">${escapeHtml(d.razon_social||'-')}</td>
+          <td>${escapeHtml(d.cliente||'-')}</td>
+          <td>${pillEstado(d._est)}</td>
+          <td>${d._est==='PICKEADO'
+            ?`<button class="btn-success" style="padding:5px 10px; font-size:11px;" data-desp="${d.id}">Despachar</button>`
+            :`<button class="btn-ghost" style="font-size:11px;" data-ver-ds="${d.id}">Ver</button>`}
+          </td>
+        </tr>`).join('')}</tbody>
+      </table></div>`;
     cont.querySelectorAll('[data-desp]').forEach(b=>b.addEventListener('click',()=>this._confirmar(Number(b.dataset.desp))));
     cont.querySelectorAll('[data-ver-ds]').forEach(b=>b.addEventListener('click',()=>Router.navigate('picking-detalle',{despachoId:b.dataset.verDs})));
   },
-  async _confirmar(id){if(!confirm('¿Confirmar salida del almacén?'))return;await finalizarDespacho(id);await this._cargar();}
+
+  async _confirmar(id) {
+    if (!confirm('¿Confirmar salida del almacén?')) return;
+    await finalizarDespacho(id);
+    await this._cargar();
+  }
 };
 Router.register('despachos-salidas', DespachosSalidasView);

@@ -571,13 +571,34 @@ async function registrarIngreso({ sku, descripcion, serie, cantidad, unidad_medi
 // FUNCIONES - KARDEX
 // ============================================================
 
-async function obtenerKardex({ sku = '', limit = 50 } = {}) {
-  let query = sb.from('kardex').select('*').order('fecha', { ascending: false }).limit(limit);
-  if (sku) query = query.ilike('sku', `%${sku}%`);
+async function obtenerKardex({ sku = '', serie = '', descripcion = '', pedido = '', limite = 100 } = {}) {
+  let query = sb.from('kardex').select('*').order('fecha', { ascending: false }).limit(limite);
+  if (sku)         query = query.ilike('sku', `%${sku}%`);
+  if (serie)       query = query.ilike('serie', `%${serie}%`);
+  if (descripcion) query = query.ilike('descripcion', `%${descripcion}%`);
+  if (pedido)      query = query.ilike('referencia', `%${pedido}%`);
   const { data, error } = await query;
   if (error) return [];
   return data || [];
 }
+
+async function editarMovimientoKardex(id, campos) {
+  const { error } = await sb.from('kardex').update(campos).eq('id', id);
+  return { error };
+}
+
+async function eliminarMovimientoKardex(id) {
+  const { error } = await sb.from('kardex').delete().eq('id', id);
+  return { error };
+}
+
+async function desactivarUbicacion(codigo, motivo) {
+  const { error } = await sb.from('ubicaciones')
+    .update({ activa: false, observaciones: motivo || null, actualizado_en: new Date().toISOString() })
+    .eq('codigo', codigo);
+  return { error };
+}
+
 
 // ============================================================
 // FUNCIONES - GUIAS PENDIENTES (carga masiva desde Excel)
