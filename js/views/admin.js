@@ -138,6 +138,15 @@ const AdminView = {
         </div>
       </div>
 
+      <p class="section-label" style="margin-top:16px;">Configuración</p>
+      <div class="admin-grid">
+        <div class="admin-action-card" onclick="AdminView.abrirModal('gestionar-condiciones')">
+          <div class="aa-icon">🏷️</div>
+          <div class="aa-title">Condiciones de ingreso</div>
+          <div class="aa-desc">Agregar o desactivar valores de condición (NUEVO, DESMONTADO, etc.)</div>
+        </div>
+      </div>
+
       <!-- MODAL CONTAINER -->
       <div id="admin-modal-cont"></div>
     `;
@@ -194,6 +203,10 @@ const AdminView = {
       'cambiar-estado-orden': {
         titulo: '🔄 Cambiar estado de orden',
         body: this._bodyCambiarEstadoOrden()
+      },
+      'gestionar-condiciones': {
+        titulo: '🏷️ Condiciones de ingreso',
+        body: this._bodyGestionarCondiciones()
       },
       'crear-ubicacion': {
         titulo: '📍 Crear ubicación',
@@ -412,7 +425,8 @@ const AdminView = {
       case 'ver-kardex-item':    this._bindVerKardex(); break;
       case 'cambiar-estado-orden': this._bindCambiarEstadoOrden(); break;
       case 'crear-ubicacion':    this._bindCrearUbicacion(); break;
-      case 'mover-masivo':       this._bindMoverMasivo(); break;
+      case 'mover-masivo':          this._bindMoverMasivo(); break;
+      case 'gestionar-condiciones': this._bindGestionarCondiciones(); break;
     }
   },
 
@@ -799,6 +813,87 @@ const AdminView = {
         ? '<p class="msg-error">Error al mover.</p>'
         : `<p class="msg-ok">✓ ${count||'Todos los'} ítems movidos a "${escapeHtml(destino)}"</p>`;
       btn.disabled = false; btn.textContent = 'Mover todos los ítems';
+    });
+  },
+
+  // ── CONDICIONES DE INGRESO ──────────────────────────────────
+  _CONDICIONES_KEY: 'wms_condiciones_ingreso',
+
+  _getCondiciones() {
+    try {
+      const raw = localStorage.getItem(this._CONDICIONES_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch(e) {}
+    return ['NUEVO','DESMONTADO','TRASPASO','CONTRATA','DEVOLUCION','EXCEDENTE'];
+  },
+
+  _saveCondiciones(lista) {
+    localStorage.setItem(this._CONDICIONES_KEY, JSON.stringify(lista));
+  },
+
+  _bodyGestionarCondiciones() {
+    const lista = this._getCondiciones();
+    return `
+      <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
+        Estos valores aparecen en el campo <strong>Condición</strong> al recepcionar mercadería.
+        Puedes agregar nuevos o eliminar los que no uses.
+      </p>
+      <div id="adm-cond-lista" style="margin-bottom:12px;">
+        ${this._renderCondicionesList(lista)}
+      </div>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <input type="text" id="adm-cond-nueva" placeholder="Nueva condición" style="flex:1; text-transform:uppercase;">
+        <button class="btn-primary" id="adm-btn-add-cond">+ Agregar</button>
+      </div>
+      <div id="adm-cond-msg" style="margin-top:8px;"></div>
+    `;
+  },
+
+  _renderCondicionesList(lista) {
+    if (!lista.length) return '<p style="color:var(--text-tertiary); font-size:12px;">Sin condiciones definidas.</p>';
+    return lista.map((c, i) => `
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px;
+                  background:var(--bg-row-alt); border-radius:6px; margin-bottom:4px;">
+        <span style="font-family:monospace; font-weight:600; font-size:13px;">${escapeHtml(c)}</span>
+        <button class="btn-icon" style="color:var(--danger-text);"
+          onclick="AdminView._eliminarCondicion(${i})" title="Eliminar">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14H6L5 6"/>
+          </svg>
+        </button>
+      </div>
+    `).join('');
+  },
+
+  _eliminarCondicion(idx) {
+    const lista = this._getCondiciones();
+    const nombre = lista[idx];
+    if (!confirm(`¿Eliminar la condición "${nombre}"?`)) return;
+    lista.splice(idx, 1);
+    this._saveCondiciones(lista);
+    const cont = document.getElementById('adm-cond-lista');
+    if (cont) cont.innerHTML = this._renderCondicionesList(lista);
+  },
+
+  _bindGestionarCondiciones() {
+    document.getElementById('adm-btn-add-cond')?.addEventListener('click', () => {
+      const inp  = document.getElementById('adm-cond-nueva');
+      const msg  = document.getElementById('adm-cond-msg');
+      const val  = (inp?.value || '').trim().toUpperCase();
+      if (!val) { msg.innerHTML = '<p class="msg-error">Escribe un nombre.</p>'; return; }
+      const lista = this._getCondiciones();
+      if (lista.includes(val)) { msg.innerHTML = '<p class="msg-error">Ya existe esa condición.</p>'; return; }
+      lista.push(val);
+      this._saveCondiciones(lista);
+      inp.value = '';
+      msg.innerHTML = `<p class="msg-ok">✓ "${val}" agregado.</p>`;
+      const cont = document.getElementById('adm-cond-lista');
+      if (cont) cont.innerHTML = this._renderCondicionesList(lista);
+    });
+
+    document.getElementById('adm-cond-nueva')?.addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('adm-btn-add-cond')?.click();
     });
   },
 };

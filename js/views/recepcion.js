@@ -304,11 +304,8 @@ const RecepcionView = {
           <div class="field">
             <label>Condición</label>
             <select id="lpn-tipo">
-              <option value="NUEVO">NUEVO</option>
-              <option value="DESMONTADO">DESMONTADO</option>
-              <option value="TRASPASO">TRASPASO</option>
-              <option value="CONTRATA">CONTRATA</option>
-              <option value="DEVOLUCION">DEVOLUCIÓN</option>
+              <option value="">-- Sin especificar --</option>
+              ${(AdminView?._getCondiciones()||['NUEVO','DESMONTADO','TRASPASO','CONTRATA','DEVOLUCION','EXCEDENTE']).map(c=>`<option value="${c}">${c}</option>`).join('')}
             </select>
           </div>
           <div class="field">
@@ -778,11 +775,8 @@ const RecepcionView = {
           <div class="field">
             <label>Condición</label>
             <select id="man-tipo">
-              <option value="NUEVO">NUEVO</option>
-              <option value="DESMONTADO">DESMONTADO</option>
-              <option value="TRASPASO">TRASPASO</option>
-              <option value="CONTRATA">CONTRATA</option>
-              <option value="DEVOLUCION">DEVOLUCIÓN</option>
+              <option value="">-- Sin especificar --</option>
+              ${(AdminView?._getCondiciones()||['NUEVO','DESMONTADO','TRASPASO','CONTRATA','DEVOLUCION','EXCEDENTE']).map(c=>`<option value="${c}">${c}</option>`).join('')}
             </select>
           </div>
           <div class="field">
