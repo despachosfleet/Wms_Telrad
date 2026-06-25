@@ -11,29 +11,37 @@ const PickingListaView = {
 
   render() {
     return `
-      <!-- Dashboard de estados -->
-      <div id="pick-dashboard" class="dashboard-stats" style="margin-bottom:10px;"></div>
+      <!-- Dashboard compacto -->
+      <div id="pick-dashboard" class="dashboard-stats" style="margin-bottom:8px;"></div>
 
-      <div class="card">
-        <!-- Filtros de búsqueda -->
-        <div class="filtros-grid" style="margin-bottom:8px;">
+      <div class="card" style="padding:10px;">
+        <!-- Fila 1: GR + Destino -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:5px;">
           <div class="field"><label>N° GR</label><input type="text" id="pick-f-gr" autocomplete="off"></div>
-          <div class="field"><label>Destino / Destinatario</label><input type="text" id="pick-f-destino" autocomplete="off"></div>
-          <div class="field"><label>Cliente</label>
-            <select id="pick-f-cliente">
+          <div class="field"><label>Destino</label><input type="text" id="pick-f-destino" autocomplete="off"></div>
+        </div>
+        <!-- Fila 2: Cliente + Fechas + Botones en una línea -->
+        <div style="display:flex;gap:5px;align-items:flex-end;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-bottom:8px;">
+          <div class="field" style="min-width:80px;flex-shrink:0;">
+            <label>Cliente</label>
+            <select id="pick-f-cliente" style="font-size:11px;padding:4px 4px;">
               <option value="">Todos</option>
               <option>ENTEL</option><option>CLARO</option><option>TELRAD</option>
             </select>
           </div>
-          <div class="field"><label>Fecha desde</label><input type="date" id="pick-desde"></div>
-          <div class="field"><label>Fecha hasta</label><input type="date" id="pick-hasta"></div>
+          <div class="field" style="min-width:100px;flex-shrink:0;">
+            <label>Desde</label>
+            <input type="date" id="pick-desde" style="font-size:11px;padding:4px;">
+          </div>
+          <div class="field" style="min-width:100px;flex-shrink:0;">
+            <label>Hasta</label>
+            <input type="date" id="pick-hasta" style="font-size:11px;padding:4px;">
+          </div>
+          <button class="btn-primary" id="pick-btn-buscar" style="flex-shrink:0;padding:5px 12px;font-size:12px;white-space:nowrap;">Buscar</button>
+          <button class="btn-ghost"   id="pick-btn-limpiar" style="flex-shrink:0;padding:5px 8px;font-size:12px;">✕</button>
         </div>
-        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
-          <button class="btn-primary" id="pick-btn-buscar">Buscar</button>
-          <button class="btn-ghost"   id="pick-btn-limpiar">Limpiar</button>
-        </div>
-        <!-- Chips de estado -->
-        <div class="chips" id="chips-estado-pick"></div>
+        <!-- Chips estado en scroll -->
+        <div id="chips-estado-pick" style="display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;flex-wrap:nowrap;padding-bottom:2px;"></div>
       </div>
       <div id="lista-pick-cont"></div>
     `;
@@ -65,11 +73,11 @@ const PickingListaView = {
   },
 
   _renderChips() {
-    const estados = [{v:'TODOS',l:'Todos'},{v:'PENDIENTE',l:'Pendiente'},{v:'EN_PROCESO',l:'En proceso'},{v:'PICKEADO',l:'Pickeado'},{v:'DESPACHADO',l:'Despachado'}];
+    const estados = [{v:'TODOS',l:'Todos'},{v:'PENDIENTE',l:'Pendiente'},{v:'EN_PROCESO',l:'En proc.'},{v:'PICKEADO',l:'Pickeado'},{v:'DESPACHADO',l:'Despachado'}];
     const el = document.getElementById('chips-estado-pick');
     if (!el) return;
     el.innerHTML = estados.map(e =>
-      `<button class="chip ${this._filtroEstado===e.v?'active':''}" data-est="${e.v}">${e.l}</button>`
+      `<button class="chip ${this._filtroEstado===e.v?'active':''}" data-est="${e.v}" style="white-space:nowrap;flex-shrink:0;padding:3px 8px;font-size:10px;">${e.l}</button>`
     ).join('');
     document.querySelectorAll('[data-est]').forEach(b => b.addEventListener('click', () => {
       this._filtroEstado=b.dataset.est; this._renderChips(); this._renderLista();
@@ -690,27 +698,33 @@ const DespachosSalidasView = {
 
   render() {
     return `
-      <!-- Dashboard estados -->
-      <div id="ds-dashboard" class="dashboard-stats" style="margin-bottom:10px;"></div>
+      <div id="ds-dashboard" class="dashboard-stats" style="margin-bottom:8px;"></div>
 
-      <div class="card">
-        <div class="filtros-grid" style="margin-bottom:8px;">
+      <div class="card" style="padding:10px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:5px;">
           <div class="field"><label>N° GR</label><input type="text" id="ds-f-gr" autocomplete="off"></div>
-          <div class="field"><label>Destino / Destinatario</label><input type="text" id="ds-f-destino" autocomplete="off"></div>
-          <div class="field"><label>Cliente</label>
-            <select id="ds-f-cliente">
+          <div class="field"><label>Destino</label><input type="text" id="ds-f-destino" autocomplete="off"></div>
+        </div>
+        <div style="display:flex;gap:5px;align-items:flex-end;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-bottom:8px;">
+          <div class="field" style="min-width:80px;flex-shrink:0;">
+            <label>Cliente</label>
+            <select id="ds-f-cliente" style="font-size:11px;padding:4px 4px;">
               <option value="">Todos</option>
               <option>ENTEL</option><option>CLARO</option><option>TELRAD</option>
             </select>
           </div>
-          <div class="field"><label>Fecha desde</label><input type="date" id="ds-desde"></div>
-          <div class="field"><label>Fecha hasta</label><input type="date" id="ds-hasta"></div>
+          <div class="field" style="min-width:100px;flex-shrink:0;">
+            <label>Desde</label>
+            <input type="date" id="ds-desde" style="font-size:11px;padding:4px;">
+          </div>
+          <div class="field" style="min-width:100px;flex-shrink:0;">
+            <label>Hasta</label>
+            <input type="date" id="ds-hasta" style="font-size:11px;padding:4px;">
+          </div>
+          <button class="btn-primary" id="ds-btn-buscar" style="flex-shrink:0;padding:5px 12px;font-size:12px;white-space:nowrap;">Buscar</button>
+          <button class="btn-ghost"   id="ds-btn-limpiar" style="flex-shrink:0;padding:5px 8px;font-size:12px;">✕</button>
         </div>
-        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
-          <button class="btn-primary" id="ds-btn-buscar">Buscar</button>
-          <button class="btn-ghost"   id="ds-btn-limpiar">Limpiar</button>
-        </div>
-        <div class="chips" id="chips-ds"></div>
+        <div id="chips-ds" style="display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;flex-wrap:nowrap;padding-bottom:2px;"></div>
       </div>
       <div id="lista-ds"></div>
     `;
@@ -744,7 +758,7 @@ const DespachosSalidasView = {
     const el = document.getElementById('chips-ds');
     if (!el) return;
     el.innerHTML = [{v:'TODOS',l:'Todos'},{v:'PICKEADO',l:'Pickeado'},{v:'DESPACHADO',l:'Despachado'}].map(e=>
-      `<button class="chip ${this._filtroEstado===e.v?'active':''}" data-ds="${e.v}">${e.l}</button>`
+      `<button class="chip ${this._filtroEstado===e.v?'active':''}" data-ds="${e.v}" style="white-space:nowrap;flex-shrink:0;padding:3px 8px;font-size:10px;">${e.l}</button>`
     ).join('');
     document.querySelectorAll('[data-ds]').forEach(b=>b.addEventListener('click',()=>{
       this._filtroEstado=b.dataset.ds; this._renderChips(); this._renderLista();

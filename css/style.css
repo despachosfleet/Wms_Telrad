@@ -206,10 +206,11 @@ main{padding-top:calc(var(--header-h) + var(--nav-h));padding-bottom:32px;min-he
 .section-label{font-size:var(--font-xs);font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-tertiary);padding:8px 0 5px;}
 
 /* DASHBOARD */
-.dashboard-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px;}
-.stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:13px;box-shadow:var(--shadow-sm);border-left:3px solid var(--accent);}
-.stat-value{font-size:24px;font-weight:800;color:var(--accent);line-height:1;}
-.stat-label{font-size:var(--font-xs);color:var(--text-secondary);margin-top:3px;text-transform:uppercase;letter-spacing:.5px;}
+.dashboard-stats{display:flex;flex-wrap:nowrap;gap:6px;margin-bottom:10px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px;}
+.dashboard-stats::-webkit-scrollbar{display:none;}
+.stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;box-shadow:var(--shadow-sm);border-left:3px solid var(--accent);flex:1;min-width:70px;flex-shrink:0;}
+.stat-value{font-size:20px;font-weight:800;color:var(--accent);line-height:1;}
+.stat-label{font-size:9px;color:var(--text-secondary);margin-top:2px;text-transform:uppercase;letter-spacing:.3px;line-height:1.2;}
 .stat-loading{color:var(--border-strong);animation:pulse 1.2s ease-in-out infinite;}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 .menu-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
@@ -348,7 +349,10 @@ main{padding-top:calc(var(--header-h) + var(--nav-h));padding-bottom:32px;min-he
 @media(min-width:640px){
   .page-inner{padding:14px 20px;}
   .menu-grid{grid-template-columns:repeat(4,1fr);}
-  .dashboard-stats{grid-template-columns:repeat(4,1fr);}
+  .dashboard-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;overflow-x:visible;}
+  .stat-card{min-width:auto;padding:13px;}
+  .stat-value{font-size:26px;}
+  .stat-label{font-size:11px;}
   .admin-grid{grid-template-columns:repeat(3,1fr);}
 }
 @media(min-width:900px){
