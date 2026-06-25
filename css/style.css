@@ -187,7 +187,11 @@ main{padding-top:calc(var(--header-h) + var(--nav-h));padding-bottom:32px;min-he
 .filtros-btn-row .btn-primary{flex-shrink:0;}
 .filtros-btn-row .btn-ghost{flex-shrink:0;}
 
+/* Solo visible en PC */
+.solo-pc { display: none; }
+
 @media(min-width:640px){
+  .solo-pc { display: block; }
   .filtros-barra{padding:10px 14px;}
   .filtros-grid{ grid-template-columns:1.5fr 1fr 1.5fr 1fr 1fr; }
   .filtros-grid-2{ grid-template-columns:1fr 1fr auto auto; }
