@@ -810,24 +810,72 @@ const DespachosSalidasView = {
       cont.innerHTML=`<div class="empty-state"><div class="empty-icon">🚛</div><strong>Sin despachos en este período</strong></div>`;
       return;
     }
+
     cont.innerHTML=`
-      <p style="font-size:11px; color:var(--text-tertiary); margin-bottom:6px;">${lista.length} despacho${lista.length!==1?'s':''}</p>
-      <div class="table-wrap"><table class="data-table">
-        <thead><tr><th>GR</th><th>Destino</th><th>Destinatario</th><th>Cliente</th><th>Estado</th><th></th></tr></thead>
-        <tbody>${lista.map(d=>`<tr>
-          <td class="sku-cell">${escapeHtml(d.gr||'-')}</td>
-          <td>${escapeHtml(d.destino||'-')}</td>
-          <td style="font-size:11px;">${escapeHtml(d.razon_social||'-')}</td>
-          <td>${escapeHtml(d.cliente||'-')}</td>
-          <td>${pillEstado(d._est)}</td>
-          <td>${d._est==='PICKEADO'
-            ?`<button class="btn-success" style="padding:5px 10px; font-size:11px;" data-desp="${d.id}">Despachar</button>`
-            :`<button class="btn-ghost" style="font-size:11px;" data-ver-ds="${d.id}">Ver</button>`}
-          </td>
-        </tr>`).join('')}</tbody>
-      </table></div>`;
+      <p style="font-size:11px;color:var(--text-tertiary);margin-bottom:6px;padding:0 2px;">${lista.length} despacho${lista.length!==1?'s':''} — toca para ver detalle</p>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        ${lista.map(d=>`
+          <div class="ds-card" data-id="${d.id}">
+            <div class="ds-card-head" onclick="DespachosSalidasView._toggleDetalle(${d.id})">
+              <div style="flex:1;min-width:0;">
+                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                  <span style="font-family:monospace;font-weight:800;font-size:13px;">${escapeHtml(d.gr||'Sin GR')}</span>
+                  ${pillEstado(d._est)}
+                  <span style="font-size:11px;color:var(--text-tertiary);">${escapeHtml(d.cliente||'')}</span>
+                </div>
+                <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">
+                  ${escapeHtml(d.destino||'')}${d.razon_social?` · ${escapeHtml(d.razon_social)}`:''}
+                </div>
+                <div style="font-size:10px;color:var(--text-tertiary);margin-top:1px;">
+                  ${d.despachos_items?.length||0} ítem${(d.despachos_items?.length||0)!==1?'s':''}
+                  ${d.fecha_despacho?` · ${formatFecha(d.fecha_despacho)}`:''}
+                </div>
+              </div>
+              <svg viewBox="0 0 24 24" width="16" height="16" class="ds-chevron" id="chev-${d.id}" style="flex-shrink:0;fill:none;stroke:var(--text-tertiary);stroke-width:2;stroke-linecap:round;"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+            <div class="ds-card-detalle" id="det-${d.id}" style="display:none;">
+              ${(d.despachos_items||[]).length ? `
+                <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px;">
+                  <table style="width:100%;border-collapse:collapse;font-size:11px;">
+                    <thead><tr style="color:var(--text-tertiary);font-size:10px;">
+                      <th style="text-align:left;padding:3px 4px;">SKU</th>
+                      <th style="text-align:left;padding:3px 4px;">Serie</th>
+                      <th style="text-align:right;padding:3px 4px;">Cant.</th>
+                    </tr></thead>
+                    <tbody>
+                      ${(d.despachos_items||[]).map(it=>`
+                        <tr style="border-top:1px solid var(--border);">
+                          <td style="padding:4px;font-family:monospace;font-size:10px;">${escapeHtml(it.sku||'-')}</td>
+                          <td style="padding:4px;font-size:10px;color:var(--text-secondary);">${escapeHtml(it.serie||'-')}</td>
+                          <td style="padding:4px;text-align:right;font-weight:700;">${formatNum(it.cantidad_despachada||it.cantidad||0)}</td>
+                        </tr>
+                      `).join('')}
+                    </tbody>
+                  </table>
+                </div>
+              ` : '<p style="font-size:11px;color:var(--text-tertiary);padding:8px 0 0;">Sin ítems registrados.</p>'}
+              <div style="margin-top:10px;display:flex;gap:6px;">
+                ${d._est==='PICKEADO'
+                  ? `<button class="btn-success" style="flex:1;padding:8px;" data-desp="${d.id}">✓ Confirmar salida</button>`
+                  : `<button class="btn-ghost" style="padding:8px 12px;" data-ver-ds="${d.id}">Ver picking →</button>`
+                }
+              </div>
+            </div>
+          </div>
+        `).join('')}
+      </div>`;
+
     cont.querySelectorAll('[data-desp]').forEach(b=>b.addEventListener('click',()=>this._confirmar(Number(b.dataset.desp))));
     cont.querySelectorAll('[data-ver-ds]').forEach(b=>b.addEventListener('click',()=>Router.navigate('picking-detalle',{despachoId:b.dataset.verDs})));
+  },
+
+  _toggleDetalle(id) {
+    const det  = document.getElementById(`det-${id}`);
+    const chev = document.getElementById(`chev-${id}`);
+    if (!det) return;
+    const abierto = det.style.display !== 'none';
+    det.style.display  = abierto ? 'none' : '';
+    if (chev) chev.style.transform = abierto ? '' : 'rotate(180deg)';
   },
 
   async _confirmar(id) {

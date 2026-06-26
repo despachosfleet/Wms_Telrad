@@ -591,3 +591,21 @@ main{padding-top:calc(var(--header-h) + var(--nav-h));padding-bottom:32px;min-he
   font-size: 13px; font-weight: 700; color: #222;
   line-height: 1;
 }
+
+/* ============================================================
+   DESPACHOS Y SALIDAS — cards expandibles
+   ============================================================ */
+.ds-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  box-shadow: var(--shadow-sm);
+  transition: border-color .15s;
+}
+.ds-card:hover { border-color: var(--accent-dim); }
+.ds-card-head {
+  display: flex; align-items: flex-start;
+  gap: 8px; cursor: pointer;
+}
+.ds-chevron { transition: transform .2s; }

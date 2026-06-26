@@ -96,20 +96,32 @@ function iniciarApp() {
     const header  = document.querySelector('.header');
     const nav     = document.getElementById('module-nav');
     const tabBar  = document.getElementById('tab-bar');
-    if (esMobil() && name === 'menu-mobile') {
-      // En menú móvil: ocultar TODO el header del sistema
-      if (header)  header.style.display  = 'none';
-      if (nav)     nav.style.display     = 'none';
-      if (tabBar)  tabBar.style.display  = 'none';
-      document.body.classList.add('is-mobile-menu');
-      // Quitar padding-top que deja el header fijo
-      document.getElementById('main-content').style.paddingTop = '0';
+    if (esMobil()) {
+      // En móvil: NUNCA mostrar barra de navegación de PC ni pestañas
+      if (nav)    nav.style.display    = 'none';
+      if (tabBar) tabBar.style.display = 'none';
+
+      if (name === 'menu-mobile') {
+        // Menú móvil: ocultar también el header del sistema
+        if (header) header.style.display = 'none';
+        document.body.classList.add('is-mobile-menu');
+        const main = document.getElementById('main-content');
+        if (main) main.style.paddingTop = '0';
+      } else {
+        // Módulos en móvil: mostrar solo el header pequeño
+        if (header) header.style.display = '';
+        document.body.classList.remove('is-mobile-menu');
+        const main = document.getElementById('main-content');
+        // Solo el header, sin barra de nav
+        if (main) main.style.paddingTop = '52px';
+      }
     } else {
-      // En cualquier otro módulo: mostrar header normal
-      if (header)  header.style.display  = '';
-      if (nav)     nav.style.display     = '';
+      // PC: todo normal
+      if (header) header.style.display = '';
+      if (nav)    nav.style.display    = '';
       document.body.classList.remove('is-mobile-menu');
-      document.getElementById('main-content').style.paddingTop = '';
+      const main = document.getElementById('main-content');
+      if (main) main.style.paddingTop = '';
     }
     _navBase(name, params);
   };
