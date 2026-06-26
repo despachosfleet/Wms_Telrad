@@ -3,6 +3,7 @@ const ConsultaView = {
   title: 'Consultar stock',
   _resultados: [], _orden: 'sku', _dir: 'asc',
   _estadoFiltro: '', _tipoFiltro: '', _expandidaFila: null,
+  _pestana: 'stock',
 
   hasProgress() { return false; },
 
@@ -10,6 +11,15 @@ const ConsultaView = {
     const isMob = window.innerWidth < 640;
     if (!isMob) return this._renderPC();
     return `
+      <!-- Pestañas Stock / Historial -->
+      <div style="display:flex;border-bottom:2px solid var(--border);background:var(--bg-card);">
+        <button id="tab-stock" onclick="ConsultaView._cambiarPestana('stock')" style="flex:1;padding:8px;font-size:12px;font-weight:700;border:none;cursor:pointer;background:none;color:${this._pestana==='stock'?'var(--accent)':'var(--text-tertiary)'};border-bottom:${this._pestana==='stock'?'2px solid var(--accent)':'2px solid transparent'};margin-bottom:-2px;">
+          📦 Stock
+        </button>
+        <button id="tab-hist" onclick="ConsultaView._cambiarPestana('historial')" style="flex:1;padding:8px;font-size:12px;font-weight:700;border:none;cursor:pointer;background:none;color:${this._pestana==='historial'?'var(--accent)':'var(--text-tertiary)'};border-bottom:${this._pestana==='historial'?'2px solid var(--accent)':'2px solid transparent'};margin-bottom:-2px;">
+          📋 Historial
+        </button>
+      </div>
       <div style="background:var(--bg-card);border-bottom:1px solid var(--border);padding:8px 10px;">
 
         <!-- Fila 1: SKU + Serie -->
@@ -74,6 +84,14 @@ const ConsultaView = {
 
   _renderPC() {
     return `
+      <div style="display:flex;border-bottom:2px solid var(--border);background:var(--bg-card);margin-bottom:0;">
+        <button id="tab-stock" onclick="ConsultaView._cambiarPestana('stock')" style="padding:10px 20px;font-size:13px;font-weight:700;border:none;cursor:pointer;background:none;color:${this._pestana==='stock'?'var(--accent)':'var(--text-tertiary)'};border-bottom:${this._pestana==='stock'?'2px solid var(--accent)':'2px solid transparent'};margin-bottom:-2px;">
+          📦 Stock disponible
+        </button>
+        <button id="tab-hist" onclick="ConsultaView._cambiarPestana('historial')" style="padding:10px 20px;font-size:13px;font-weight:700;border:none;cursor:pointer;background:none;color:${this._pestana==='historial'?'var(--accent)':'var(--text-tertiary)'};border-bottom:${this._pestana==='historial'?'2px solid var(--accent)':'2px solid transparent'};margin-bottom:-2px;">
+          📋 Historial de movimientos
+        </button>
+      </div>
       <div class="filtros-barra">
         <div class="filtros-grid">
           <div class="field"><label>SKU</label><input id="f-sku" type="text" autocomplete="off"></div>
@@ -104,6 +122,72 @@ const ConsultaView = {
         </div>
       </div>
       <div id="cont-resultado-stock"></div>
+    `;
+  },
+
+  _cambiarPestana(tab) {
+    this._pestana = tab;
+    // Re-renderizar para mostrar pestañas activas
+    const main = document.getElementById('main-content');
+    if (main) {
+      main.innerHTML = `<div class="page-inner">${this.render()}</div>`;
+      this.afterRender();
+    }
+  },
+
+  async _buscarHistorial() {
+    const sku    = document.getElementById('f-sku')?.value.trim()    || '';
+    const serie  = document.getElementById('f-serie')?.value.trim()  || '';
+    const paleta = document.getElementById('f-paleta')?.value.trim() || '';
+    const cont   = document.getElementById('cont-resultado-stock');
+    if (!sku && !serie && !paleta) {
+      cont.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div>Ingresa SKU, serie o pedido para ver el historial.</div>';
+      return;
+    }
+    const btn = document.getElementById('btn-buscar-stock');
+    if (btn) { btn.disabled=true; btn.textContent='Buscando…'; }
+    cont.innerHTML = '<div class="empty-state"><div class="empty-icon">⏳</div>Cargando historial…</div>';
+
+    const movs = await obtenerKardex({ sku, serie, pedido: paleta, limite: 200 });
+
+    if (btn) { btn.disabled=false; btn.textContent='Buscar'; }
+
+    if (!movs.length) {
+      cont.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div>Sin movimientos registrados para estos filtros.</div>';
+      return;
+    }
+
+    const tipoConfig = {
+      'INGRESO':              { label:'Ingreso',     clase:'pill-success', icon:'↓' },
+      'SALIDA':               { label:'Salida',      clase:'pill-danger',  icon:'↑' },
+      'MOVIMIENTO_UBICACION': { label:'Movimiento',  clase:'pill-warning', icon:'→' },
+      'AJUSTE':               { label:'Ajuste',      clase:'pill-neutral', icon:'~' },
+    };
+
+    cont.innerHTML = `
+      <p style="font-size:11px;color:var(--text-tertiary);margin-bottom:6px;">${movs.length} movimiento${movs.length!==1?'s':''}</p>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr>
+            <th>Fecha</th><th>Tipo</th><th>SKU</th><th>Serie</th>
+            <th>Cant.</th><th>Referencia / GR</th>
+          </tr></thead>
+          <tbody>
+            ${movs.map(m => {
+              const conf = tipoConfig[m.tipo_movimiento] || {label:m.tipo_movimiento, clase:'pill-neutral', icon:'·'};
+              const fecha = m.fecha ? new Date(m.fecha).toLocaleString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '-';
+              return `<tr>
+                <td style="font-size:11px;white-space:nowrap;">${fecha}</td>
+                <td><span class="pill ${conf.clase}" style="font-size:10px;">${conf.icon} ${conf.label}</span></td>
+                <td class="sku-cell">${escapeHtml(m.sku||'-')}</td>
+                <td class="serie-cell" style="font-size:10px;">${escapeHtml(m.serie||'-')}</td>
+                <td style="font-weight:700;">${formatNum(m.cantidad)}</td>
+                <td style="font-size:11px;">${escapeHtml(m.referencia||m.observaciones||'-')}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
     `;
   },
 
@@ -161,9 +245,11 @@ const ConsultaView = {
   },
 
   async _buscar() {
+    if (this._pestana === 'historial') { await this._buscarHistorial(); return; }
     const btn=document.getElementById('btn-buscar-stock');
     const cont=document.getElementById('cont-resultado-stock');
     if(btn){ btn.disabled=true; btn.textContent='Buscando…'; }
+    const estadoSel = document.getElementById('f-estado-stock')?.value || this._estadoFiltro || '';
     const { data } = await buscarStockAvanzado({
       sku:         document.getElementById('f-sku')?.value.trim()||'',
       serie:       document.getElementById('f-serie')?.value.trim()||'',
@@ -171,11 +257,13 @@ const ConsultaView = {
       paleta:      document.getElementById('f-paleta')?.value.trim()||'',
       ubic:        document.getElementById('f-ubic')?.value.trim()||'',
       cliente:     (document.getElementById('f-cliente')?.value || document.getElementById('f-cliente-pc')?.value || ''),
-      estado:      document.getElementById('f-estado-stock')?.value || this._estadoFiltro,
+      estado:      estadoSel,
       tipo:        document.getElementById('f-tipo-stock')?.value || this._tipoFiltro,
       orden:this._orden, dir:this._dir, limit:300,
     });
-    this._resultados=data||[]; this._expandidaFila=null;
+    // Filtrar cantidad > 0 para no mostrar stock agotado (a menos que se filtre por DESPACHADO)
+    const resultados = estadoSel === 'DESPACHADO' ? (data||[]) : (data||[]).filter(r => Number(r.cantidad) > 0);
+    this._resultados=resultados; this._expandidaFila=null;
     if(btn){ btn.disabled=false; btn.textContent='Buscar'; }
     this._renderTabla(cont);
   },
