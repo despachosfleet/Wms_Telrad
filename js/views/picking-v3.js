@@ -19,7 +19,7 @@ const PickingListaView = {
           <div class="field" style="margin:0;"><label style="font-size:9px;text-transform:uppercase;color:var(--text-tertiary);">Destino</label><input type="text" id="pick-f-destino" autocomplete="off" style="padding:5px 7px;font-size:12px;"></div>
         </div>
         <!-- Selects + Fechas + Botones -->
-        <div style="display:flex;gap:4px;align-items:center;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-bottom:5px;">
+        <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-bottom:5px;">
           <select id="pick-f-estado" style="flex:1;min-width:80px;font-size:11px;padding:4px 3px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--bg-input);color:var(--text);">
             <option value="">Estado</option>
             <option value="PENDIENTE">Pendiente</option>
@@ -699,7 +699,7 @@ const DespachosSalidasView = {
           <div class="field" style="margin:0;"><label style="font-size:9px;text-transform:uppercase;color:var(--text-tertiary);">N° GR</label><input type="text" id="ds-f-gr" autocomplete="off" style="padding:5px 7px;font-size:12px;"></div>
           <div class="field" style="margin:0;"><label style="font-size:9px;text-transform:uppercase;color:var(--text-tertiary);">Destino</label><input type="text" id="ds-f-destino" autocomplete="off" style="padding:5px 7px;font-size:12px;"></div>
         </div>
-        <div style="display:flex;gap:4px;align-items:center;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;">
+        <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;">
           <select id="ds-f-estado" style="flex:1;min-width:90px;font-size:11px;padding:4px 3px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--bg-input);color:var(--text);">
             <option value="">Estado</option>
             <option value="PICKEADO">Pickeado</option>
