@@ -15,30 +15,27 @@ const PickingListaView = {
       <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;padding:8px 10px;">
         <!-- GR + Destino -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:5px;">
-          <div class="field"><label>N° GR</label><input type="text" id="pick-f-gr" autocomplete="off"></div>
-          <div class="field"><label>Destino</label><input type="text" id="pick-f-destino" autocomplete="off"></div>
+          <div class="field" style="margin:0;"><label style="font-size:9px;text-transform:uppercase;color:var(--text-tertiary);">N° GR</label><input type="text" id="pick-f-gr" autocomplete="off" style="padding:5px 7px;font-size:12px;"></div>
+          <div class="field" style="margin:0;"><label style="font-size:9px;text-transform:uppercase;color:var(--text-tertiary);">Destino</label><input type="text" id="pick-f-destino" autocomplete="off" style="padding:5px 7px;font-size:12px;"></div>
         </div>
-        <!-- Cliente + Fechas + Botones en fila scrollable -->
-        <div style="display:flex;gap:4px;align-items:flex-end;overflow-x:auto;scrollbar-width:none;margin-bottom:6px;flex-wrap:nowrap;">
-          <div class="field" style="flex-shrink:0;min-width:75px;margin-bottom:0;">
-            <label>Cliente</label>
-            <select id="pick-f-cliente" style="font-size:11px;padding:3px 4px;">
-              <option value="">Todos</option><option>ENTEL</option><option>CLARO</option><option>TELRAD</option>
-            </select>
-          </div>
-          <div class="field" style="flex-shrink:0;margin-bottom:0;">
-            <label>Desde</label>
-            <input type="date" id="pick-desde" style="font-size:11px;padding:3px 4px;width:120px;">
-          </div>
-          <div class="field" style="flex-shrink:0;margin-bottom:0;">
-            <label>Hasta</label>
-            <input type="date" id="pick-hasta" style="font-size:11px;padding:3px 4px;width:120px;">
-          </div>
-          <button class="btn-primary" id="pick-btn-buscar" style="flex-shrink:0;padding:5px 12px;font-size:12px;white-space:nowrap;align-self:flex-end;">Buscar</button>
-          <button class="btn-ghost"   id="pick-btn-limpiar" style="flex-shrink:0;padding:5px 7px;font-size:12px;align-self:flex-end;">✕</button>
+        <!-- Selects + Fechas + Botones -->
+        <div style="display:flex;gap:4px;align-items:center;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-bottom:5px;">
+          <select id="pick-f-estado" style="flex:1;min-width:80px;font-size:11px;padding:4px 3px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--bg-input);color:var(--text);">
+            <option value="">Estado</option>
+            <option value="PENDIENTE">Pendiente</option>
+            <option value="EN_PROCESO">En proceso</option>
+            <option value="PICKEADO">Pickeado</option>
+            <option value="DESPACHADO">Despachado</option>
+          </select>
+          <select id="pick-f-cliente" style="flex:1;min-width:70px;font-size:11px;padding:4px 3px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--bg-input);color:var(--text);">
+            <option value="">Cliente</option>
+            <option>ENTEL</option><option>CLARO</option><option>TELRAD</option>
+          </select>
+          <input type="date" id="pick-desde" style="flex:1;min-width:100px;font-size:11px;padding:4px 3px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--bg-input);color:var(--text);">
+          <input type="date" id="pick-hasta" style="flex:1;min-width:100px;font-size:11px;padding:4px 3px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--bg-input);color:var(--text);">
+          <button class="btn-primary" id="pick-btn-buscar" style="flex-shrink:0;padding:5px 10px;font-size:12px;white-space:nowrap;">Buscar</button>
+          <button class="btn-ghost"   id="pick-btn-limpiar" style="flex-shrink:0;padding:5px 7px;font-size:12px;">✕</button>
         </div>
-        <!-- Chips estado -->
-        <div id="chips-estado-pick" style="display:flex;gap:3px;overflow-x:auto;scrollbar-width:none;flex-wrap:nowrap;"></div>
       </div>
       <div id="lista-pick-cont"></div>
     `;
@@ -124,10 +121,11 @@ const PickingListaView = {
     const fGR     = (document.getElementById('pick-f-gr')?.value||'').trim().toLowerCase();
     const fDest   = (document.getElementById('pick-f-destino')?.value||'').trim().toLowerCase();
     const fCliente= (document.getElementById('pick-f-cliente')?.value||'').toUpperCase();
+    const fEstado = document.getElementById('pick-f-estado')?.value||'';
     let lista = this._despachos
       .filter(d => d.status !== 'BORRADOR')
       .map(d => ({...d, _est: calcularEstadoVisual(d)}));
-    if (this._filtroEstado !== 'TODOS') lista = lista.filter(d => d._est===this._filtroEstado);
+    if (fEstado) lista = lista.filter(d => d._est===fEstado);
     if (fGR)      lista = lista.filter(d => (d.gr||'').toLowerCase().includes(fGR));
     if (fDest)    lista = lista.filter(d => (d.destino||'').toLowerCase().includes(fDest) || (d.razon_social||'').toLowerCase().includes(fDest));
     if (fCliente) lista = lista.filter(d => (d.cliente||'').toUpperCase()===fCliente);
@@ -698,28 +696,24 @@ const DespachosSalidasView = {
       <div id="ds-dashboard" class="dashboard-stats" style="margin-bottom:6px;"></div>
       <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;padding:8px 10px;">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:5px;">
-          <div class="field"><label>N° GR</label><input type="text" id="ds-f-gr" autocomplete="off"></div>
-          <div class="field"><label>Destino</label><input type="text" id="ds-f-destino" autocomplete="off"></div>
+          <div class="field" style="margin:0;"><label style="font-size:9px;text-transform:uppercase;color:var(--text-tertiary);">N° GR</label><input type="text" id="ds-f-gr" autocomplete="off" style="padding:5px 7px;font-size:12px;"></div>
+          <div class="field" style="margin:0;"><label style="font-size:9px;text-transform:uppercase;color:var(--text-tertiary);">Destino</label><input type="text" id="ds-f-destino" autocomplete="off" style="padding:5px 7px;font-size:12px;"></div>
         </div>
-        <div style="display:flex;gap:4px;align-items:flex-end;overflow-x:auto;scrollbar-width:none;margin-bottom:6px;flex-wrap:nowrap;">
-          <div class="field" style="flex-shrink:0;min-width:75px;margin-bottom:0;">
-            <label>Cliente</label>
-            <select id="ds-f-cliente" style="font-size:11px;padding:3px 4px;">
-              <option value="">Todos</option><option>ENTEL</option><option>CLARO</option><option>TELRAD</option>
-            </select>
-          </div>
-          <div class="field" style="flex-shrink:0;margin-bottom:0;">
-            <label>Desde</label>
-            <input type="date" id="ds-desde" style="font-size:11px;padding:3px 4px;width:120px;">
-          </div>
-          <div class="field" style="flex-shrink:0;margin-bottom:0;">
-            <label>Hasta</label>
-            <input type="date" id="ds-hasta" style="font-size:11px;padding:3px 4px;width:120px;">
-          </div>
-          <button class="btn-primary" id="ds-btn-buscar" style="flex-shrink:0;padding:5px 12px;font-size:12px;white-space:nowrap;align-self:flex-end;">Buscar</button>
-          <button class="btn-ghost"   id="ds-btn-limpiar" style="flex-shrink:0;padding:5px 7px;font-size:12px;align-self:flex-end;">✕</button>
+        <div style="display:flex;gap:4px;align-items:center;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;">
+          <select id="ds-f-estado" style="flex:1;min-width:90px;font-size:11px;padding:4px 3px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--bg-input);color:var(--text);">
+            <option value="">Estado</option>
+            <option value="PICKEADO">Pickeado</option>
+            <option value="DESPACHADO">Despachado</option>
+          </select>
+          <select id="ds-f-cliente" style="flex:1;min-width:70px;font-size:11px;padding:4px 3px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--bg-input);color:var(--text);">
+            <option value="">Cliente</option>
+            <option>ENTEL</option><option>CLARO</option><option>TELRAD</option>
+          </select>
+          <input type="date" id="ds-desde" style="flex:1;min-width:100px;font-size:11px;padding:4px 3px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--bg-input);color:var(--text);">
+          <input type="date" id="ds-hasta" style="flex:1;min-width:100px;font-size:11px;padding:4px 3px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--bg-input);color:var(--text);">
+          <button class="btn-primary" id="ds-btn-buscar" style="flex-shrink:0;padding:5px 10px;font-size:12px;white-space:nowrap;">Buscar</button>
+          <button class="btn-ghost"   id="ds-btn-limpiar" style="flex-shrink:0;padding:5px 7px;font-size:12px;">✕</button>
         </div>
-        <div id="chips-ds" style="display:flex;gap:3px;overflow-x:auto;scrollbar-width:none;flex-wrap:nowrap;"></div>
       </div>
       <div id="lista-ds"></div>
     `;
@@ -800,8 +794,9 @@ const DespachosSalidasView = {
     const fGR     = (document.getElementById('ds-f-gr')?.value||'').trim().toLowerCase();
     const fDest   = (document.getElementById('ds-f-destino')?.value||'').trim().toLowerCase();
     const fCliente= (document.getElementById('ds-f-cliente')?.value||'').toUpperCase();
+    const fEstadoDS = document.getElementById('ds-f-estado')?.value||'';
     let lista = this._despachos.filter(d=>d.status!=='BORRADOR').map(d=>({...d,_est:calcularEstadoVisual(d)}));
-    if (this._filtroEstado!=='TODOS') lista=lista.filter(d=>d._est===this._filtroEstado);
+    if (fEstadoDS) lista=lista.filter(d=>d._est===fEstadoDS);
     if (fGR)      lista=lista.filter(d=>(d.gr||'').toLowerCase().includes(fGR));
     if (fDest)    lista=lista.filter(d=>(d.destino||'').toLowerCase().includes(fDest)||(d.razon_social||'').toLowerCase().includes(fDest));
     if (fCliente) lista=lista.filter(d=>(d.cliente||'').toUpperCase()===fCliente);

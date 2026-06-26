@@ -22,13 +22,11 @@ const ConsultaView = {
           </div>
         </div>
 
-        <!-- Fila 2: Paleta + Buscar + X + ⊕ -->
+        <!-- Fila 2: Paleta + botones -->
         <div style="display:flex;gap:4px;align-items:center;margin-bottom:5px;">
           <input id="f-paleta" type="text" placeholder="Paleta / Pedido" autocomplete="off"
             style="flex:1;min-width:0;padding:5px 7px;font-size:12px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--bg-input);color:var(--text);">
-          <button class="btn-primary" id="btn-buscar-stock" style="flex-shrink:0;padding:5px 10px;font-size:12px;">Buscar</button>
-          <button class="btn-ghost"   id="btn-limpiar-stock" style="flex-shrink:0;padding:5px 8px;font-size:12px;">✕</button>
-          <button class="btn-ghost"   id="btn-toggle-extra" style="flex-shrink:0;padding:5px 8px;font-size:11px;" title="Más filtros">⊕</button>
+          <button class="btn-ghost" id="btn-toggle-extra" style="flex-shrink:0;padding:5px 8px;font-size:11px;" title="Más filtros">⊕</button>
         </div>
 
         <!-- Filtros extra — ocultos por defecto -->
@@ -43,25 +41,28 @@ const ConsultaView = {
               <input id="f-ubic" type="text" autocomplete="off" style="padding:5px 7px;font-size:12px;">
             </div>
           </div>
-          <select id="f-cliente" style="width:100%;font-size:12px;padding:5px 7px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--bg-input);color:var(--text);">
-            <option value="">Todos los clientes</option><option>ENTEL</option><option>CLARO</option><option>TELRAD</option>
-          </select>
         </div>
 
-        <!-- Fila 3: Chips Est + Tipo en scroll separado -->
-        <div style="display:flex;gap:3px;overflow-x:auto;scrollbar-width:none;flex-wrap:nowrap;align-items:center;padding-bottom:2px;">
-          <span style="font-size:9px;font-weight:700;color:var(--text-tertiary);white-space:nowrap;flex-shrink:0;">Est:</span>
-          <div id="chips-estado-stock" style="display:flex;gap:2px;flex-wrap:nowrap;flex-shrink:0;">
-            ${['','DISPONIBLE','RESERVADO','DESPACHADO','DAÑADO'].map((e,i)=>
-              `<button class="chip ${i===0?'active':''}" data-est-stock="${e}" style="white-space:nowrap;flex-shrink:0;padding:2px 6px;font-size:9px;">${i===0?'Todos':e==='DISPONIBLE'?'Disp':e==='RESERVADO'?'Res':e==='DESPACHADO'?'Desp':'Dañ'}</button>`
-            ).join('')}
-          </div>
-          <span style="font-size:9px;font-weight:700;color:var(--text-tertiary);white-space:nowrap;flex-shrink:0;margin-left:4px;">Tipo:</span>
-          <div id="chips-tipo-stock" style="display:flex;gap:2px;flex-wrap:nowrap;flex-shrink:0;">
-            ${['','MUDANZA','INGRESO NUEVO'].map((t,i)=>
-              `<button class="chip ${i===0?'active':''}" data-tipo-stock="${t}" style="white-space:nowrap;flex-shrink:0;padding:2px 6px;font-size:9px;">${i===0?'Todos':t==='MUDANZA'?'Mud':'Ing'}</button>`
-            ).join('')}
-          </div>
+        <!-- Fila 3: Selects Estado + Tipo + Cliente + Buscar + Limpiar -->
+        <div style="display:flex;gap:4px;align-items:center;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;">
+          <select id="f-estado-stock" style="flex:1;min-width:70px;font-size:11px;padding:4px 4px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--bg-input);color:var(--text);">
+            <option value="">Estado</option>
+            <option value="DISPONIBLE">Disponible</option>
+            <option value="RESERVADO">Reservado</option>
+            <option value="DESPACHADO">Despachado</option>
+            <option value="DAÑADO">Dañado</option>
+          </select>
+          <select id="f-tipo-stock" style="flex:1;min-width:70px;font-size:11px;padding:4px 4px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--bg-input);color:var(--text);">
+            <option value="">Tipo</option>
+            <option value="MUDANZA">Mudanza</option>
+            <option value="INGRESO NUEVO">Ing. Nuevo</option>
+          </select>
+          <select id="f-cliente" style="flex:1;min-width:70px;font-size:11px;padding:4px 4px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--bg-input);color:var(--text);">
+            <option value="">Cliente</option>
+            <option>ENTEL</option><option>CLARO</option><option>TELRAD</option>
+          </select>
+          <button class="btn-primary" id="btn-buscar-stock" style="flex-shrink:0;padding:5px 10px;font-size:12px;white-space:nowrap;">Buscar</button>
+          <button class="btn-ghost"   id="btn-limpiar-stock" style="flex-shrink:0;padding:5px 7px;font-size:12px;">✕</button>
         </div>
 
       </div>
@@ -113,7 +114,8 @@ const ConsultaView = {
   _limpiar() {
     ['f-sku','f-serie','f-desc','f-paleta','f-ubic'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
     const cl=document.getElementById('f-cliente'); if(cl) cl.value='';
-    const clpc=document.getElementById('f-cliente-pc'); if(clpc) clpc.value='';
+    const es=document.getElementById('f-estado-stock'); if(es) es.value='';
+    const ti=document.getElementById('f-tipo-stock'); if(ti) ti.value='';
     this._estadoFiltro=''; this._tipoFiltro='';
     document.querySelectorAll('[data-est-stock]').forEach((c,i)=>c.classList.toggle('active',i===0));
     document.querySelectorAll('[data-tipo-stock]').forEach((c,i)=>c.classList.toggle('active',i===0));
@@ -132,8 +134,8 @@ const ConsultaView = {
       paleta:      document.getElementById('f-paleta')?.value.trim()||'',
       ubic:        document.getElementById('f-ubic')?.value.trim()||'',
       cliente:     (document.getElementById('f-cliente')?.value || document.getElementById('f-cliente-pc')?.value || ''),
-      estado:      this._estadoFiltro,
-      tipo:        this._tipoFiltro,
+      estado:      document.getElementById('f-estado-stock')?.value || this._estadoFiltro,
+      tipo:        document.getElementById('f-tipo-stock')?.value || this._tipoFiltro,
       orden:this._orden, dir:this._dir, limit:300,
     });
     this._resultados=data||[]; this._expandidaFila=null;
