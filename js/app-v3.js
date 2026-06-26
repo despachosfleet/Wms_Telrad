@@ -108,12 +108,12 @@ function iniciarApp() {
         const main = document.getElementById('main-content');
         if (main) main.style.paddingTop = '0';
       } else {
-        // Módulos en móvil: mostrar solo el header pequeño
+        // Módulos en móvil: mostrar solo el header pequeño, sin barra nav
         if (header) header.style.display = '';
         document.body.classList.remove('is-mobile-menu');
         const main = document.getElementById('main-content');
-        // Solo el header, sin barra de nav
-        if (main) main.style.paddingTop = '52px';
+        // Header = 52px, sin barra de nav (44px) ni pestañas
+        if (main) { main.style.paddingTop = '52px'; main.style.paddingLeft='8px'; main.style.paddingRight='8px'; }
       }
     } else {
       // PC: todo normal

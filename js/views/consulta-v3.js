@@ -8,51 +8,68 @@ const ConsultaView = {
 
   render() {
     return `
-      <div style="background:var(--bg-card);border-bottom:1px solid var(--border);padding:8px 10px;position:sticky;top:52px;z-index:100;">
+      <div style="background:var(--bg-card);border-bottom:1px solid var(--border);padding:8px 10px;">
+
+        <!-- Fila 1: SKU + Serie -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:5px;">
-          <div class="field" style="margin:0;"><label style="font-size:9px;text-transform:uppercase;">SKU</label><input id="f-sku" type="text" autocomplete="off" style="padding:5px 7px;font-size:12px;"></div>
-          <div class="field" style="margin:0;"><label style="font-size:9px;text-transform:uppercase;">Serie</label><input id="f-serie" type="text" autocomplete="off" style="padding:5px 7px;font-size:12px;font-family:monospace;"></div>
+          <div class="field" style="margin:0;">
+            <label style="font-size:9px;text-transform:uppercase;color:var(--text-tertiary);">SKU</label>
+            <input id="f-sku" type="text" autocomplete="off" style="padding:5px 7px;font-size:12px;">
+          </div>
+          <div class="field" style="margin:0;">
+            <label style="font-size:9px;text-transform:uppercase;color:var(--text-tertiary);">Serie</label>
+            <input id="f-serie" type="text" autocomplete="off" style="padding:5px 7px;font-size:12px;font-family:monospace;">
+          </div>
         </div>
+
+        <!-- Fila 2: Paleta + Buscar + X + ⊕ -->
         <div style="display:flex;gap:4px;align-items:center;margin-bottom:5px;">
-          <input id="f-paleta" type="text" placeholder="Paleta / Pedido" autocomplete="off" style="flex:1;padding:5px 7px;font-size:12px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--bg-input);color:var(--text);">
-          <button class="btn-primary" id="btn-buscar-stock" style="flex-shrink:0;padding:5px 12px;font-size:12px;white-space:nowrap;">Buscar</button>
-          <button class="btn-ghost"   id="btn-limpiar-stock" style="flex-shrink:0;padding:5px 7px;font-size:12px;">✕</button>
-          <button class="btn-ghost"   id="btn-toggle-extra" style="flex-shrink:0;padding:5px 7px;font-size:12px;">⊕</button>
+          <input id="f-paleta" type="text" placeholder="Paleta / Pedido" autocomplete="off"
+            style="flex:1;min-width:0;padding:5px 7px;font-size:12px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--bg-input);color:var(--text);">
+          <button class="btn-primary" id="btn-buscar-stock" style="flex-shrink:0;padding:5px 10px;font-size:12px;">Buscar</button>
+          <button class="btn-ghost"   id="btn-limpiar-stock" style="flex-shrink:0;padding:5px 8px;font-size:12px;">✕</button>
+          <button class="btn-ghost"   id="btn-toggle-extra" style="flex-shrink:0;padding:5px 8px;font-size:11px;" title="Más filtros">⊕</button>
         </div>
+
+        <!-- Filtros extra — ocultos por defecto -->
         <div id="filtros-extra" style="display:none;margin-bottom:5px;">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:4px;">
-            <div class="field" style="margin:0;"><label style="font-size:9px;">Descripción</label><input id="f-desc" type="text" autocomplete="off" style="padding:5px 7px;font-size:12px;"></div>
-            <div class="field" style="margin:0;"><label style="font-size:9px;">Ubicación</label><input id="f-ubic" type="text" autocomplete="off" style="padding:5px 7px;font-size:12px;"></div>
+            <div class="field" style="margin:0;">
+              <label style="font-size:9px;text-transform:uppercase;color:var(--text-tertiary);">Descripción</label>
+              <input id="f-desc" type="text" autocomplete="off" style="padding:5px 7px;font-size:12px;">
+            </div>
+            <div class="field" style="margin:0;">
+              <label style="font-size:9px;text-transform:uppercase;color:var(--text-tertiary);">Ubicación</label>
+              <input id="f-ubic" type="text" autocomplete="off" style="padding:5px 7px;font-size:12px;">
+            </div>
           </div>
           <select id="f-cliente" style="width:100%;font-size:12px;padding:5px 7px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--bg-input);color:var(--text);">
             <option value="">Todos los clientes</option><option>ENTEL</option><option>CLARO</option><option>TELRAD</option>
           </select>
         </div>
-        <div style="display:flex;gap:3px;overflow-x:auto;scrollbar-width:none;flex-wrap:nowrap;align-items:center;">
+
+        <!-- Fila 3: Chips Est + Tipo en scroll separado -->
+        <div style="display:flex;gap:3px;overflow-x:auto;scrollbar-width:none;flex-wrap:nowrap;align-items:center;padding-bottom:2px;">
           <span style="font-size:9px;font-weight:700;color:var(--text-tertiary);white-space:nowrap;flex-shrink:0;">Est:</span>
-          <div id="chips-estado-stock" style="display:flex;gap:2px;flex-wrap:nowrap;">
+          <div id="chips-estado-stock" style="display:flex;gap:2px;flex-wrap:nowrap;flex-shrink:0;">
             ${['','DISPONIBLE','RESERVADO','DESPACHADO','DAÑADO'].map((e,i)=>
-              `<button class="chip ${i===0?'active':''}" data-est-stock="${e}" style="white-space:nowrap;flex-shrink:0;padding:2px 7px;font-size:9px;">${i===0?'Todos':e==='DISPONIBLE'?'Disp':e==='RESERVADO'?'Res':e==='DESPACHADO'?'Desp':'Dañ'}</button>`
+              `<button class="chip ${i===0?'active':''}" data-est-stock="${e}" style="white-space:nowrap;flex-shrink:0;padding:2px 6px;font-size:9px;">${i===0?'Todos':e==='DISPONIBLE'?'Disp':e==='RESERVADO'?'Res':e==='DESPACHADO'?'Desp':'Dañ'}</button>`
             ).join('')}
           </div>
           <span style="font-size:9px;font-weight:700;color:var(--text-tertiary);white-space:nowrap;flex-shrink:0;margin-left:4px;">Tipo:</span>
-          <div id="chips-tipo-stock" style="display:flex;gap:2px;flex-wrap:nowrap;">
+          <div id="chips-tipo-stock" style="display:flex;gap:2px;flex-wrap:nowrap;flex-shrink:0;">
             ${['','MUDANZA','INGRESO NUEVO'].map((t,i)=>
-              `<button class="chip ${i===0?'active':''}" data-tipo-stock="${t}">${i===0?'Todos':t==='INGRESO NUEVO'?'Ing. Nuevo':t}</button>`
+              `<button class="chip ${i===0?'active':''}" data-tipo-stock="${t}" style="white-space:nowrap;flex-shrink:0;padding:2px 6px;font-size:9px;">${i===0?'Todos':t==='MUDANZA'?'Mud':'Ing'}</button>`
             ).join('')}
           </div>
-          <select id="f-cliente" style="font-size:11px;padding:4px 6px;flex-shrink:0;max-width:100px;">
-            <option value="">Todos</option><option>ENTEL</option><option>CLARO</option><option>TELRAD</option>
-          </select>
-          <button class="btn-primary" id="btn-buscar-stock" style="flex-shrink:0;white-space:nowrap;padding:5px 14px;font-size:12px;">Buscar</button>
-          <button class="btn-ghost"   id="btn-limpiar-stock" style="flex-shrink:0;white-space:nowrap;padding:5px 10px;font-size:12px;">Limpiar</button>
         </div>
+
       </div>
-      <div id="cont-resultado-stock"></div>
+      <div id="cont-resultado-stock" style="padding:4px 2px;"></div>
     `;
   },
 
-  afterRender() {
+    afterRender() {
     this._estadoFiltro=''; this._tipoFiltro=''; this._expandidaFila=null;
     this._extraVisible = false;
 
