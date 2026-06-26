@@ -7,6 +7,8 @@ const ConsultaView = {
   hasProgress() { return false; },
 
   render() {
+    const isMob = window.innerWidth < 640;
+    if (!isMob) return this._renderPC();
     return `
       <div style="background:var(--bg-card);border-bottom:1px solid var(--border);padding:8px 10px;">
 
@@ -70,7 +72,42 @@ const ConsultaView = {
     `;
   },
 
-    afterRender() {
+    _renderPC() {
+    return `
+      <div class="filtros-barra">
+        <div class="filtros-grid">
+          <div class="field"><label>SKU</label><input id="f-sku" type="text" autocomplete="off"></div>
+          <div class="field"><label>Serie</label><input id="f-serie" type="text" autocomplete="off" style="font-family:monospace;"></div>
+          <div class="field"><label>Descripción</label><input id="f-desc" type="text" autocomplete="off"></div>
+          <div class="field"><label>Pedido / Paleta</label><input id="f-paleta" type="text" autocomplete="off"></div>
+          <div class="field"><label>Ubicación</label><input id="f-ubic" type="text" autocomplete="off"></div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;">
+          <select id="f-estado-stock" style="font-size:12px;padding:5px 8px;">
+            <option value="">Todos los estados</option>
+            <option value="DISPONIBLE">Disponible</option>
+            <option value="RESERVADO">Reservado</option>
+            <option value="DESPACHADO">Despachado</option>
+            <option value="DAÑADO">Dañado</option>
+          </select>
+          <select id="f-tipo-stock" style="font-size:12px;padding:5px 8px;">
+            <option value="">Todos los tipos</option>
+            <option value="MUDANZA">Mudanza</option>
+            <option value="INGRESO NUEVO">Ingreso nuevo</option>
+          </select>
+          <select id="f-cliente" style="font-size:12px;padding:5px 8px;">
+            <option value="">Todos los clientes</option>
+            <option>ENTEL</option><option>CLARO</option><option>TELRAD</option>
+          </select>
+          <button class="btn-primary" id="btn-buscar-stock" style="padding:6px 16px;">Buscar</button>
+          <button class="btn-ghost"   id="btn-limpiar-stock" style="padding:6px 12px;">Limpiar</button>
+        </div>
+      </div>
+      <div id="cont-resultado-stock"></div>
+    \`;
+  },
+
+  afterRender() {
     this._estadoFiltro=''; this._tipoFiltro=''; this._expandidaFila=null;
     this._extraVisible = false;
 

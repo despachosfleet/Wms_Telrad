@@ -24,8 +24,16 @@ function formatNum(n) {
 function formatFecha(str) {
   if (!str) return '-';
   try {
+    // Si es solo fecha (YYYY-MM-DD), parsear directamente sin timezone
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+      const [y, m, d] = str.split('-');
+      return `${d}/${m}/${y}`;
+    }
+    // Si tiene hora, usar fecha local
     const d = new Date(str);
-    return d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const offset = d.getTimezoneOffset() * 60000;
+    const local = new Date(d.getTime() - offset);
+    return local.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
   } catch { return str; }
 }
 
@@ -33,7 +41,9 @@ function formatFechaHora(str) {
   if (!str) return '-';
   try {
     const d = new Date(str);
-    return d.toLocaleString('es-PE', {
+    const offset = d.getTimezoneOffset() * 60000;
+    const local = new Date(d.getTime() - offset);
+    return local.toLocaleString('es-PE', {
       day: '2-digit', month: '2-digit', year: 'numeric',
       hour: '2-digit', minute: '2-digit'
     });
