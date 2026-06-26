@@ -72,7 +72,7 @@ const ConsultaView = {
     `;
   },
 
-    _renderPC() {
+  _renderPC() {
     return `
       <div class="filtros-barra">
         <div class="filtros-grid">
@@ -104,7 +104,7 @@ const ConsultaView = {
         </div>
       </div>
       <div id="cont-resultado-stock"></div>
-    \`;
+    `;
   },
 
   afterRender() {
@@ -199,7 +199,7 @@ const ConsultaView = {
           <thead><tr>
             ${th('sku','SKU')} ${th('descripcion','Descripción')} ${th('serie','Serie')}
             ${th('cantidad','Cant.')} ${th('ubicacion_fisica','Ubicación')} ${th('paleta_pedido','Paleta/Pedido')}
-            ${th('tipo','Tipo')} ${th('estado','Estado')}
+            ${th('tipo','Tipo ingreso')} ${th('estado','Estado')}
           </tr></thead>
           <tbody id="tbody-stock">${this._renderFilas()}</tbody>
         </table>
