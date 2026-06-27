@@ -1330,3 +1330,39 @@ function exportarRecepcionAExcel(items, nombreArchivo) {
   XLSX.utils.book_append_sheet(wb, ws, 'Ingresos');
   XLSX.writeFile(wb, nombreArchivo || 'recepcion_sharepoint.xlsx');
 }
+
+// Buscar ítem en stock por serie — identifica SKU y pedido automáticamente
+async function buscarPorSerie(serie) {
+  if (!serie) return null;
+  const { data, error } = await sb
+    .from('stock')
+    .select('id, sku, descripcion, serie, paleta_pedido, cantidad, estado, cliente, tipo')
+    .ilike('serie', serie.trim())
+    .in('estado', ['DISPONIBLE', 'RESERVADO'])
+    .limit(1)
+    .single();
+  if (error || !data) return null;
+  return data;
+}
+
+// Generar lote de LPNs para impresión masiva
+async function generarLoteLPN(cantidad) {
+  const { data: ultimo } = await sb
+    .from('lpns')
+    .select('codigo')
+    .ilike('codigo', 'LPN%')
+    .order('codigo', { ascending: false })
+    .limit(1);
+  
+  let inicio = 1;
+  if (ultimo && ultimo.length > 0) {
+    const num = parseInt(ultimo[0].codigo.replace('LPN', ''), 10);
+    if (!isNaN(num)) inicio = num + 1;
+  }
+  
+  const codigos = [];
+  for (let i = 0; i < cantidad; i++) {
+    codigos.push(`LPN${String(inicio + i).padStart(5, '0')}`);
+  }
+  return codigos;
+}
