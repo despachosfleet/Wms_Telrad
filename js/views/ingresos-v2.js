@@ -522,14 +522,15 @@ const IngresosView = {
   _renderLPN(c){
     c.innerHTML=`
       ${this._btnVolver()}
+
+      <!-- Cabecera general: fecha + tipo + Excel cadena -->
       <div class="card" style="margin-bottom:8px;padding:10px 12px;">
-        <p class="card-title" style="margin-bottom:8px;">Recepción con LPN</p>
-        <div style="display:flex;gap:6px;margin-bottom:8px;align-items:flex-end;flex-wrap:wrap;">
-          <div class="field" style="margin:0;flex:1;min-width:120px;">
-            <label style="font-size:9px;text-transform:uppercase;color:var(--text-tertiary);">Fecha de ingreso</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
+          <div class="field" style="margin:0;">
+            <label style="font-size:9px;text-transform:uppercase;color:var(--text-tertiary);">Fecha de ingreso *</label>
             <input type="date" id="lpn-fecha" value="${this._fechaIngreso}" style="font-size:12px;padding:5px 7px;">
           </div>
-          <div class="field" style="margin:0;flex:1;min-width:120px;">
+          <div class="field" style="margin:0;">
             <label style="font-size:9px;text-transform:uppercase;color:var(--text-tertiary);">Tipo de ingreso</label>
             <select id="lpn-tipo-ing" style="font-size:12px;padding:5px 7px;">
               <option value="INGRESO NUEVO">Ingreso nuevo</option>
@@ -537,24 +538,408 @@ const IngresosView = {
             </select>
           </div>
         </div>
-        <p style="font-size:11px;color:var(--text-tertiary);">Carga el Excel de cadena para ver los pedidos esperados (opcional).</p>
-        <label style="display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border:1px solid var(--border-strong);border-radius:6px;cursor:pointer;font-size:11px;margin-top:4px;">
-          📊 Cargar Excel de cadena
-          <input type="file" id="input-cadena-lpn" accept=".xlsx,.xls" style="display:none;">
-        </label>
-        <span id="cadena-status" style="font-size:11px;color:var(--success-text);margin-left:8px;display:none;">✓ Cargado</span>
+
+        <!-- Excel de cadena opcional -->
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <label style="display:inline-flex;align-items:center;gap:6px;padding:5px 10px;
+            border:1px solid var(--border-strong);border-radius:6px;cursor:pointer;font-size:11px;">
+            📊 ${this._cadenaOrdenes ? 'Cambiar Excel cadena' : 'Cargar Excel cadena (opcional)'}
+            <input type="file" id="input-cadena-lpn" accept=".xlsx,.xls" style="display:none;">
+          </label>
+          ${this._cadenaOrdenes ? `<span style="font-size:11px;color:var(--success-text);">✓ ${this._cadenaOrdenes.size} pedido(s) cargados</span>` : ''}
+        </div>
+
+        <!-- Selector de pedido si hay cadena -->
+        ${this._cadenaOrdenes ? `
+          <div style="margin-top:8px;">
+            <label style="font-size:9px;text-transform:uppercase;color:var(--text-tertiary);">Pedido activo</label>
+            <select id="sel-pedido-lpn" style="width:100%;font-size:12px;padding:5px 7px;margin-top:3px;">
+              <option value="">— Seleccionar pedido —</option>
+              ${[...this._cadenaOrdenes.keys()].map(p=>`
+                <option value="${escapeHtml(p)}" ${this._pedidoActual===p?'selected':''}>${escapeHtml(p)}</option>
+              `).join('')}
+            </select>
+          </div>
+        ` : `
+          <div style="margin-top:8px;">
+            <label style="font-size:9px;text-transform:uppercase;color:var(--text-tertiary);">N° Pedido *</label>
+            <input type="text" id="lpn-pedido-manual" value="${escapeHtml(this._pedidoActual)}"
+              placeholder="Número de pedido" style="width:100%;font-size:12px;padding:5px 7px;margin-top:3px;">
+          </div>
+        `}
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px;">
+          <div class="field" style="margin:0;">
+            <label style="font-size:9px;text-transform:uppercase;color:var(--text-tertiary);">N° GR</label>
+            <input type="text" id="lpn-gr" value="${escapeHtml(this._gr)}"
+              placeholder="T022-00381" style="font-size:12px;padding:5px 7px;">
+          </div>
+          <div class="field" style="margin:0;">
+            <label style="font-size:9px;text-transform:uppercase;color:var(--text-tertiary);">LPN activo</label>
+            <div style="display:flex;gap:4px;">
+              <input type="text" id="lpn-codigo-inp" placeholder="LPN00001"
+                style="flex:1;font-family:monospace;font-size:12px;padding:5px 7px;font-weight:700;color:var(--accent);"
+                value="${this._lpnActual?.codigo||''}">
+              <button class="btn-icon btn-scan" id="btn-scan-lpn" style="flex-shrink:0;padding:5px;" title="Escanear LPN">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/><rect x="3" y="16" width="5" height="5"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+        <button class="btn-primary" id="btn-activar-lpn" style="margin-top:8px;width:100%;padding:7px;">
+          ${this._lpnActual ? '✓ LPN activo: ' + this._lpnActual.codigo + ' — Cambiar' : 'Activar LPN'}
+        </button>
+        <div id="lpn-msg" style="font-size:11px;margin-top:4px;"></div>
       </div>
-      <p style="font-size:11px;color:var(--text-tertiary);text-align:center;padding:20px;">
-        Módulo de pistolaje LPN — próximamente en esta vista.
-      </p>
-    `;
+
+      <!-- Layout 2 columnas -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+
+        <!-- Columna izquierda: pistolaje -->
+        <div>
+          <!-- Ítems esperados del pedido -->
+          ${this._pedidoActual && this._cadenaOrdenes?.get(this._pedidoActual) ? `
+            <div class="card" style="padding:10px 12px;margin-bottom:8px;">
+              <p style="font-size:11px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;margin-bottom:6px;">
+                Esperado — ${this._cadenaOrdenes.get(this._pedidoActual).items?.length||0} ítem(s)
+              </p>
+              <div id="lpn-esperados" style="max-height:180px;overflow-y:auto;">
+                ${this._renderEsperados()}
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- Panel de pistolaje -->
+          <div class="card" style="padding:10px 12px;" id="panel-pistolaje">
+            <p class="card-title" style="margin-bottom:8px;">Pistolaje</p>
+
+            <!-- SKU con autocompletado -->
+            <div class="field" style="margin-bottom:6px;">
+              <label style="font-size:9px;text-transform:uppercase;color:var(--text-tertiary);">SKU (escribe para buscar)</label>
+              <input type="text" id="lpn-sku-search" placeholder="Buscar por SKU o descripción..."
+                autocomplete="off" style="width:100%;font-size:12px;padding:5px 7px;">
+              <div id="lpn-sku-sugerencias" style="display:none;border:1px solid var(--border-strong);
+                border-radius:0 0 6px 6px;background:var(--bg-card);max-height:150px;overflow-y:auto;"></div>
+            </div>
+
+            <!-- Info del SKU seleccionado -->
+            <div id="lpn-sku-info" style="display:none;padding:6px 8px;background:var(--accent-dim);
+              border-radius:6px;font-size:11px;margin-bottom:6px;">
+            </div>
+
+            <!-- Serie -->
+            <div class="field" style="margin-bottom:6px;">
+              <label style="font-size:9px;text-transform:uppercase;color:var(--text-tertiary);">Serie</label>
+              <div style="display:flex;gap:4px;">
+                <input type="text" id="lpn-serie" placeholder="Escanear o escribir serie"
+                  style="flex:1;font-family:monospace;font-size:12px;padding:5px 7px;">
+                <button class="btn-icon btn-scan" id="btn-scan-serie-lpn" style="flex-shrink:0;padding:5px;">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/><rect x="3" y="16" width="5" height="5"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Cantidad -->
+            <div class="field" style="margin-bottom:8px;">
+              <label style="font-size:9px;text-transform:uppercase;color:var(--text-tertiary);">Cantidad</label>
+              <input type="number" id="lpn-cant" value="1" min="1"
+                style="font-size:12px;padding:5px 7px;width:100px;">
+            </div>
+
+            <button class="btn-primary" id="btn-agregar-lpn" style="width:100%;padding:8px;">
+              + Agregar ítem
+            </button>
+          </div>
+        </div>
+
+        <!-- Columna derecha: lista de lo confirmado -->
+        <div class="card" style="padding:10px 12px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:4px;">
+            <p class="card-title" style="margin:0;">Confirmados (<span id="lpn-count">0</span>)</p>
+            <button class="btn-secondary" id="btn-cerrar-lpn"
+              style="font-size:11px;padding:4px 10px;display:none;">Cerrar LPN ✓</button>
+          </div>
+          <div id="lpn-lista" style="max-height:400px;overflow-y:auto;">
+            <div class="empty-state" style="padding:12px 0;">
+              <div class="empty-icon">📭</div>Sin ítems aún
+            </div>
+          </div>
+
+          <!-- Resumen sesión al cerrar LPN -->
+          <div id="lpn-sesion" style="display:${this._sesionItems.length?'':'none'};margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+            <p style="font-size:11px;font-weight:700;margin-bottom:4px;">
+              Sesión: <span id="sesion-count">${this._sesionItems.length}</span> ítem(s) en ${[...new Set(this._sesionItems.map(i=>i._lpn))].length} LPN(s)
+            </p>
+            <div id="sesion-lpns"></div>
+            <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+              <button class="btn-primary" id="btn-exportar-sesion" style="font-size:12px;">↓ Exportar Excel</button>
+              <button class="btn-ghost" id="btn-nueva-sesion" style="font-size:12px;">Nueva sesión</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    \`;
     this._bindVolver();
+    this._bindLPNEventos();
+    this._renderItemsLPN();
+    if(this._sesionItems.length) this._renderSesion();
+  },
+
+  _renderEsperados(){
+    const orden = this._cadenaOrdenes?.get(this._pedidoActual);
+    if(!orden?.items?.length) return '<p style="font-size:11px;color:var(--text-tertiary);">Sin ítems.</p>';
+    return orden.items.map(it=>{
+      const conf = this._itemsLPN.some(i=>
+        (it.serie && i.SERIE && i.SERIE.toUpperCase()===String(it.serie).toUpperCase()) ||
+        (!it.serie && i.MATERIAL===it.sku)
+      );
+      return `<div style="display:flex;align-items:center;gap:6px;padding:3px 4px;border-radius:4px;
+        background:${conf?'var(--success-bg)':'transparent'};">
+        <span style="font-size:13px;">${conf?'✅':'⬜'}</span>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:11px;font-weight:700;font-family:monospace;">${escapeHtml(it.sku||'')}</div>
+          <div style="font-size:10px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(it.descripcion||'')}</div>
+        </div>
+        <span style="font-size:11px;font-weight:700;flex-shrink:0;">${it.cantidad||1}</span>
+      </div>`;
+    }).join('');
+  },
+
+  _bindLPNEventos(){
+    // Excel cadena
     document.getElementById('input-cadena-lpn')?.addEventListener('change',async e=>{
       if(!e.target.files[0])return;
-      const ordenes=await extraerTodasLasOrdenes(e.target.files[0]);
-      this._cadenaOrdenes=ordenes;
-      document.getElementById('cadena-status').style.display='';
+      const ordenes = await extraerTodasLasOrdenes(e.target.files[0]);
+      // Agrupar por pedido
+      const porPedido = new Map();
+      for(const [gr, orden] of ordenes){
+        for(const item of orden.items){
+          const ped = item.pedido_pallet || gr;
+          if(!porPedido.has(ped)) porPedido.set(ped,{pedido:ped,gr,items:[]});
+          porPedido.get(ped).items.push(item);
+        }
+      }
+      this._cadenaOrdenes = porPedido;
+      this._pedidoActual  = '';
+      this._renderLPN(document.getElementById('ing-contenido'));
     });
+
+    // Selector pedido
+    document.getElementById('sel-pedido-lpn')?.addEventListener('change',e=>{
+      this._pedidoActual = e.target.value||'';
+      const orden = this._cadenaOrdenes?.get(this._pedidoActual);
+      if(orden?.gr){ const g=document.getElementById('lpn-gr'); if(g) g.value=orden.gr; this._gr=orden.gr; }
+      const esp = document.getElementById('lpn-esperados');
+      if(esp) esp.innerHTML = this._renderEsperados();
+    });
+
+    // Escanear LPN
+    document.getElementById('btn-scan-lpn')?.addEventListener('click',()=>{
+      abrirEscaner('ing-contenido',txt=>{
+        const i=document.getElementById('lpn-codigo-inp'); if(i) i.value=txt.toUpperCase();
+      },e=>alert(e));
+    });
+
+    // Activar LPN
+    document.getElementById('btn-activar-lpn')?.addEventListener('click',()=>this._activarLPN());
+    document.getElementById('lpn-codigo-inp')?.addEventListener('keydown',e=>{if(e.key==='Enter')this._activarLPN();});
+
+    // SKU autocompletado
+    let _skuTimer = null;
+    document.getElementById('lpn-sku-search')?.addEventListener('input',e=>{
+      clearTimeout(_skuTimer);
+      const val = e.target.value.trim();
+      if(val.length < 2){ document.getElementById('lpn-sku-sugerencias').style.display='none'; return; }
+      _skuTimer = setTimeout(()=>this._buscarSKU(val), 300);
+    });
+
+    // Escanear serie
+    document.getElementById('btn-scan-serie-lpn')?.addEventListener('click',()=>{
+      abrirEscaner('ing-contenido',txt=>{
+        const i=document.getElementById('lpn-serie'); if(i){ i.value=txt; }
+      },e=>alert(e));
+    });
+
+    // Agregar ítem
+    document.getElementById('btn-agregar-lpn')?.addEventListener('click',()=>this._agregarItemLPN());
+    document.getElementById('lpn-serie')?.addEventListener('keydown',e=>{if(e.key==='Enter')this._agregarItemLPN();});
+
+    // Cerrar LPN
+    document.getElementById('btn-cerrar-lpn')?.addEventListener('click',()=>this._cerrarLPN());
+
+    // Exportar sesión
+    document.getElementById('btn-exportar-sesion')?.addEventListener('click',()=>{
+      exportarRecepcionAExcel(this._sesionItems,`ingresos_${this._fechaIngreso}.xlsx`);
+    });
+
+    document.getElementById('btn-nueva-sesion')?.addEventListener('click',()=>{
+      if(confirm('¿Iniciar nueva sesión? Los LPNs cerrados quedan guardados.')){
+        this._sesionItems=[]; this._lpnActual=null; this._itemsLPN=[];
+        this._renderLPN(document.getElementById('ing-contenido'));
+      }
+    });
+  },
+
+  async _buscarSKU(texto){
+    const sug = document.getElementById('lpn-sku-sugerencias');
+    if(!sug) return;
+    // Buscar en el pedido activo primero, luego en stock general
+    let resultados = [];
+    if(this._pedidoActual && this._cadenaOrdenes?.get(this._pedidoActual)){
+      const items = this._cadenaOrdenes.get(this._pedidoActual).items||[];
+      resultados = items.filter(it=>
+        (it.sku||'').toUpperCase().includes(texto.toUpperCase()) ||
+        (it.descripcion||'').toUpperCase().includes(texto.toUpperCase())
+      ).slice(0,8).map(it=>({sku:it.sku, desc:it.descripcion, fuente:'cadena'}));
+    }
+    if(resultados.length < 3){
+      const {data} = await buscarStockAvanzado({textoLibre:texto, limit:6});
+      const yaHay = new Set(resultados.map(r=>r.sku));
+      (data||[]).forEach(r=>{ if(!yaHay.has(r.sku)) resultados.push({sku:r.sku,desc:r.descripcion,fuente:'stock'}); });
+    }
+    if(!resultados.length){ sug.style.display='none'; return; }
+    sug.style.display='';
+    sug.innerHTML = resultados.map(r=>`
+      <div class="lpn-sug-item" data-sku="${escapeHtml(r.sku)}" data-desc="${escapeHtml(r.desc||'')}"
+        style="padding:6px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border);">
+        <span style="font-family:monospace;font-weight:700;">${escapeHtml(r.sku)}</span>
+        <span style="color:var(--text-tertiary);font-size:10px;margin-left:6px;">${escapeHtml(r.desc||'')}</span>
+        ${r.fuente==='cadena'?'<span class="pill pill-success" style="font-size:9px;margin-left:4px;">esperado</span>':''}
+      </div>
+    `).join('');
+    sug.querySelectorAll('.lpn-sug-item').forEach(el=>{
+      el.addEventListener('mouseenter',()=>el.style.background='var(--bg-row-alt)');
+      el.addEventListener('mouseleave',()=>el.style.background='');
+      el.addEventListener('click',()=>{
+        const sku=el.dataset.sku, desc=el.dataset.desc;
+        document.getElementById('lpn-sku-search').value=sku;
+        sug.style.display='none';
+        const info=document.getElementById('lpn-sku-info');
+        if(info){
+          info.style.display='';
+          info.innerHTML=`<strong>${escapeHtml(sku)}</strong> — ${escapeHtml(desc)}`;
+        }
+        // Mostrar series esperadas si hay cadena
+        if(this._pedidoActual && this._cadenaOrdenes?.get(this._pedidoActual)){
+          const items=(this._cadenaOrdenes.get(this._pedidoActual).items||[]).filter(i=>i.sku===sku);
+          if(items.length && info){
+            const seriesEsp=items.filter(i=>i.serie).map(i=>i.serie);
+            if(seriesEsp.length) info.innerHTML+=`<br><span style="font-size:10px;color:var(--text-tertiary);">Series esperadas: ${seriesEsp.join(', ')}</span>`;
+          }
+        }
+        document.getElementById('lpn-serie')?.focus();
+      });
+    });
+  },
+
+  async _activarLPN(){
+    const codigo = document.getElementById('lpn-codigo-inp')?.value.trim().toUpperCase();
+    const pedido = document.getElementById('sel-pedido-lpn')?.value || document.getElementById('lpn-pedido-manual')?.value.trim() || '';
+    const gr     = document.getElementById('lpn-gr')?.value.trim()||'';
+    const msg    = document.getElementById('lpn-msg');
+    if(!codigo){if(msg)msg.innerHTML='<span style="color:var(--danger-text);">Escanea o escribe el código LPN.</span>';return;}
+    if(!pedido){if(msg)msg.innerHTML='<span style="color:var(--danger-text);">Selecciona o ingresa un N° de pedido.</span>';return;}
+    this._pedidoActual=pedido; this._gr=gr;
+    const {data,error}=await crearLPN({codigo,cliente:'',n_guia:gr,observaciones:pedido});
+    if(error && !String(error).includes('duplicate')){
+      if(msg)msg.innerHTML=`<span style="color:var(--danger-text);">Error: ${escapeHtml(String(error))}</span>`;return;
+    }
+    this._lpnActual={id:data?.id,codigo};
+    this._itemsLPN=[];
+    document.getElementById('btn-activar-lpn').textContent=`✓ LPN activo: ${codigo} — Cambiar`;
+    document.getElementById('btn-cerrar-lpn').style.display='none';
+    if(msg)msg.innerHTML=`<span style="color:var(--success-text);">✓ LPN ${escapeHtml(codigo)} activado. Pedido: ${escapeHtml(pedido)}</span>`;
+    document.getElementById('lpn-sku-search')?.focus();
+    this._renderItemsLPN();
+  },
+
+  _agregarItemLPN(){
+    if(!this._lpnActual){alert('Activa un LPN primero.');return;}
+    const sku  = document.getElementById('lpn-sku-search')?.value.trim().toUpperCase();
+    const serie= document.getElementById('lpn-serie')?.value.trim()||'-';
+    const cant = Number(document.getElementById('lpn-cant')?.value)||1;
+    const desc = document.getElementById('lpn-sku-info')?.textContent?.split('—')[1]?.trim()||'';
+    if(!sku){alert('Selecciona un SKU.');return;}
+    const tipo = document.getElementById('lpn-tipo-ing')?.value||'INGRESO NUEVO';
+    const fecha= document.getElementById('lpn-fecha')?.value||this._fechaIngreso;
+    this._itemsLPN.push({
+      MATERIAL:sku, DESCRIPCION:desc, SERIE:serie,
+      CANTIDAD_RECIBIDA:cant, N_PEDIDO:this._pedidoActual,
+      N_GUIA:this._gr, TIPO_INGRESO:tipo, FECHA:fecha,
+      _lpn:this._lpnActual.codigo,
+    });
+    // Limpiar
+    document.getElementById('lpn-sku-search').value='';
+    document.getElementById('lpn-sku-info').style.display='none';
+    document.getElementById('lpn-serie').value='';
+    document.getElementById('lpn-cant').value='1';
+    document.getElementById('lpn-sku-search')?.focus();
+    this._renderItemsLPN();
+    // Actualizar esperados
+    const esp=document.getElementById('lpn-esperados');
+    if(esp) esp.innerHTML=this._renderEsperados();
+  },
+
+  _renderItemsLPN(){
+    const lista=document.getElementById('lpn-lista');
+    const count=document.getElementById('lpn-count');
+    const btnC=document.getElementById('btn-cerrar-lpn');
+    if(count)count.textContent=this._itemsLPN.length;
+    if(btnC)btnC.style.display=this._lpnActual&&this._itemsLPN.length>0?'':'none';
+    if(!lista)return;
+    if(!this._itemsLPN.length){lista.innerHTML='<div class="empty-state" style="padding:12px 0;"><div class="empty-icon">📭</div>Sin ítems</div>';return;}
+    lista.innerHTML=`<div class="table-wrap"><table class="data-table">
+      <thead><tr><th>SKU</th><th>Serie</th><th>Cant.</th><th>Pedido</th><th></th></tr></thead>
+      <tbody>${this._itemsLPN.map((it,i)=>`<tr>
+        <td class="sku-cell" style="font-size:11px;">${escapeHtml(it.MATERIAL)}</td>
+        <td class="serie-cell" style="font-size:10px;">${escapeHtml(it.SERIE||'—')}</td>
+        <td style="font-weight:700;color:var(--accent);">${it.CANTIDAD_RECIBIDA}</td>
+        <td style="font-size:10px;">${escapeHtml(it.N_PEDIDO||'—')}</td>
+        <td><button class="btn-icon" style="color:var(--danger);" onclick="IngresosView._eliminarItemLPN(${i})">
+          <svg viewBox="0 0 24 24" width="12" height="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
+        </button></td>
+      </tr>`).join('')}</tbody>
+    </table></div>`;
+  },
+
+  _eliminarItemLPN(idx){this._itemsLPN.splice(idx,1);this._renderItemsLPN();},
+
+  async _cerrarLPN(){
+    if(!this._itemsLPN.length){alert('Agrega ítems antes de cerrar el LPN.');return;}
+    const btn=document.getElementById('btn-cerrar-lpn');
+    if(btn){btn.disabled=true;btn.textContent='Guardando…';}
+    const {error,count}=await registrarItemsEnLPN(this._lpnActual.id,this._lpnActual.codigo,this._itemsLPN);
+    if(error){if(btn){btn.disabled=false;btn.textContent='Cerrar LPN ✓';}alert('Error: '+error);return;}
+    this._sesionItems.push(...this._itemsLPN.map(i=>({...i,_lpn:this._lpnActual.codigo})));
+    this._itemsLPN=[]; this._lpnActual=null;
+    document.getElementById('btn-activar-lpn').textContent='Activar LPN';
+    document.getElementById('lpn-codigo-inp').value='';
+    if(btn){btn.disabled=false;btn.textContent='Cerrar LPN ✓';btn.style.display='none';}
+    this._renderItemsLPN();
+    this._renderSesion();
+    document.getElementById('lpn-sesion').style.display='';
+    const msg=document.getElementById('lpn-msg');
+    if(msg)msg.innerHTML=`<span style="color:var(--success-text);">✓ LPN cerrado — ${count} ítem(s) guardados. Activa otro LPN para continuar.</span>`;
+  },
+
+  _renderSesion(){
+    const lista=document.getElementById('sesion-lpns');
+    const count=document.getElementById('sesion-count');
+    if(count)count.textContent=this._sesionItems.length;
+    if(!lista)return;
+    const lpns=[...new Set(this._sesionItems.map(i=>i._lpn))];
+    lista.innerHTML=lpns.map(lpn=>{
+      const items=this._sesionItems.filter(i=>i._lpn===lpn);
+      const peds=[...new Set(items.map(i=>i.N_PEDIDO).filter(Boolean))];
+      return `<div style="padding:5px 8px;background:var(--bg-row-alt);border-radius:5px;margin-bottom:3px;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <span style="font-family:monospace;font-weight:700;font-size:12px;color:var(--accent);">${escapeHtml(lpn)}</span>
+          <span style="font-size:10px;color:var(--text-tertiary);margin-left:6px;">${items.length} ítem(s)</span>
+          <div style="font-size:10px;color:var(--text-tertiary);">${peds.join(', ')||'—'}</div>
+        </div>
+        <span class="pill pill-success" style="font-size:9px;">Cerrado</span>
+      </div>`;
+    }).join('');
   },
 };
 
