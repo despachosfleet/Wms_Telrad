@@ -18,8 +18,7 @@ const MODULOS = [
     id: 'mod-almacen', label: 'Almacén',
     icono: '<svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
     subs: [
-      { nav: 'ingresos',    label: 'Ingresos',    desc: 'Subir Excel o ingreso manual' },
-      { nav: 'recepcion',   label: 'Recepción',   desc: 'Pistolaje LPN en campo' },
+      { nav: 'ingresos',    label: 'Ingresos',    desc: 'Excel, manual y recepción LPN' },
       { nav: 'movimientos', label: 'Movimientos', desc: 'Mover ítems o paletas' },
       { nav: 'ubicaciones', label: 'Ubicaciones', desc: 'Ver y gestionar posiciones' },
     ]
@@ -158,11 +157,7 @@ const MenuView = {
         </button>
         <button class="menu-item" data-nav="ingresos">
           <div class="mi-icon">📥</div>
-          <span>Ingresos</span><small>Excel o manual</small>
-        </button>
-        <button class="menu-item" data-nav="recepcion">
-          <div class="mi-icon">🔬</div>
-          <span>Recepción</span><small>Pistolaje LPN</small>
+          <span>Ingresos</span><small>Excel, manual y LPN</small>
         </button>
         <button class="menu-item" data-nav="movimientos">
           <div class="mi-icon">🔄</div>
