@@ -156,9 +156,13 @@ const MenuView = {
           <div class="mi-icon">🔍</div>
           <span>Consultar stock</span><small>SKU, serie, paleta</small>
         </button>
-        <button class="menu-item" data-nav="recepcion">
+        <button class="menu-item" data-nav="ingresos">
           <div class="mi-icon">📥</div>
-          <span>Recepción</span><small>Registrar ingresos</small>
+          <span>Ingresos</span><small>Subir Excel o manual</small>
+        </button>
+        <button class="menu-item" data-nav="recepcion">
+          <div class="mi-icon">🔬</div>
+          <span>Recepción</span><small>Pistolaje LPN en campo</small>
         </button>
         <button class="menu-item" data-nav="movimientos">
           <div class="mi-icon">🔄</div>

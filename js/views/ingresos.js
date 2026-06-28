@@ -569,7 +569,7 @@ const IngresosView = {
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
             <div><span style="color:var(--text-tertiary);">Fecha:</span> ${formatFecha(info.fecha)}</div>
             <div><span style="color:var(--text-tertiary);">GR:</span> ${escapeHtml(info.gr||'—')}</div>
-            <div><span style="color:var(--text-tertiary);">Tipo:</span> ${info.tipo||'—'}</div>
+            <div><span style="color:var(--text-tertiary);">Tipo de ingreso:</span> ${info.tipo||'—'}</div>
             <div><span style="color:var(--text-tertiary);">Ítems:</span> <strong>${info.items}</strong></div>
           </div>
           <button class="btn-secondary" style="font-size:10px;padding:3px 8px;margin-top:6px;"
