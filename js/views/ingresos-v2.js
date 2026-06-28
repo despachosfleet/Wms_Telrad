@@ -678,7 +678,7 @@ const IngresosView = {
           </div>
         </div>
       </div>
-    \`;
+    `;
     this._bindVolver();
     this._bindLPNEventos();
     this._renderItemsLPN();
