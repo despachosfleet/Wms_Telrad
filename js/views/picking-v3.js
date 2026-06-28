@@ -136,7 +136,7 @@ const PickingListaView = {
     cont.innerHTML=`
       <div class="table-wrap">
         <table class="data-table">
-          <thead><tr><th>GR</th><th>Destino</th><th>Destinatario</th><th>Cliente</th><th>Ítems</th><th>Progreso</th><th>Estado</th><th></th></tr></thead>
+          <thead><tr><th>GR</th><th>Destino</th><th>Destinatario / Contrata</th><th>Cliente</th><th>Ítems</th><th>Progreso</th><th>Estado</th><th></th></tr></thead>
           <tbody>
             ${lista.map(d => {
               const items=d.despachos_items||[];
@@ -153,9 +153,14 @@ const PickingListaView = {
                   <div class="progress-bar"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
                 </td>
                 <td>${pillEstado(d._est)}</td>
-                <td>${d._est!=='DESPACHADO'
-                  ?`<button class="btn-primary" style="padding:5px 12px; font-size:11px;" data-pick="${d.id}">Pickear</button>`
-                  :`<button class="btn-ghost" data-ver="${d.id}">Ver</button>`}</td>
+                <td style="display:flex;gap:4px;flex-wrap:nowrap;">
+                  ${d._est!=='DESPACHADO'
+                    ?`<button class="btn-primary" style="padding:5px 10px;font-size:11px;" data-pick="${d.id}">Pickear</button>`
+                    :`<button class="btn-ghost" style="padding:5px 8px;font-size:11px;" data-ver="${d.id}">Ver</button>`}
+                  ${d._est!=='DESPACHADO'
+                    ?`<button class="btn-danger" style="padding:5px 8px;font-size:11px;" data-del="${d.id}" title="Eliminar orden">🗑</button>`
+                    :''}
+                </td>
               </tr>`;
             }).join('')}
           </tbody>
@@ -163,6 +168,13 @@ const PickingListaView = {
       </div>`;
     cont.querySelectorAll('[data-pick]').forEach(b => b.addEventListener('click', () => Router.navigate('picking',{despachoId:b.dataset.pick})));
     cont.querySelectorAll('[data-ver]').forEach(b => b.addEventListener('click', () => Router.navigate('picking-detalle',{despachoId:b.dataset.ver})));
+    cont.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', async () => {
+      if(!confirm('¿Eliminar esta orden de picking? Esta acción no se puede deshacer.')) return;
+      b.disabled=true; b.textContent='...';
+      const {error} = await sb.from('despachos').delete().eq('id', Number(b.dataset.del));
+      if(error){ alert('Error al eliminar: '+error.message); b.disabled=false; b.textContent='🗑'; return; }
+      await PickingListaView._cargar();
+    }));
   }
 };
 Router.register('picking-lista', PickingListaView);

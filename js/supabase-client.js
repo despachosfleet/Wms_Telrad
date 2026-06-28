@@ -16,7 +16,17 @@ async function buscarStockAvanzado({ sku = '', serie = '', ubic = '', paleta = '
   if (sku)         query = query.ilike('sku',             '%' + sku.trim() + '%');
   if (serie)       query = query.ilike('serie',           '%' + serie.trim() + '%');
   if (ubic)        query = query.ilike('ubicacion_fisica','%' + ubic.trim() + '%');
-  if (paleta)      query = query.ilike('paleta_pedido',   '%' + paleta.trim() + '%');
+  if (paleta) {
+    // Normalizar: buscar tanto "018" como "18" — PALETA 18 = PALETA 018
+    const paletaTrim = paleta.trim();
+    const paletaNum  = paletaTrim.replace(/^(\D+)0+(\d+)$/, '$1$2'); // PALETA 018 → PALETA 18
+    const paletaPad  = paletaTrim.replace(/^(\D+)(\d+)$/, (_, p, n) => p + n.padStart(3,'0')); // PALETA 18 → PALETA 018
+    if (paletaNum !== paletaTrim || paletaPad !== paletaTrim) {
+      query = query.or(`paleta_pedido.ilike.%${paletaTrim}%,paleta_pedido.ilike.%${paletaNum}%,paleta_pedido.ilike.%${paletaPad}%`);
+    } else {
+      query = query.ilike('paleta_pedido', '%' + paletaTrim + '%');
+    }
+  }
   if (descripcion) query = query.ilike('descripcion',     '%' + descripcion.trim() + '%');
   if (cliente)     query = query.eq('cliente', cliente);
   if (estado)      query = query.eq('estado',  estado);
@@ -1025,34 +1035,46 @@ async function anularOrdenCompleta(despachoId) {
 
 // Revertir despacho — restaura stock y elimina el despacho
 async function revertirDespacho(despachoId) {
-  // Obtener ítems con stock_id asignado
+  // Obtener ítems del despacho
   const { data: items } = await sb.from('despachos_items')
     .select('*').eq('despacho_id', despachoId);
+  if (!items?.length) {
+    // Solo eliminar el despacho si no tiene ítems
+    await sb.from('despachos').delete().eq('id', despachoId);
+    return { error: null };
+  }
 
-  // Restaurar cada ítem de stock
-  for (const it of (items || [])) {
-    if (!it.stock_id || !it.observaciones?.startsWith('PICKEADO')) continue;
-    const match = it.observaciones.match(/PICKEADO:\s*([\d.]+)/);
-    const cantRestaurar = match ? Number(match[1]) : it.cantidad;
-    const { data: stockRow } = await sb.from('stock').select('cantidad').eq('id', it.stock_id).single();
+  // Restaurar stock y registrar en kardex
+  for (const it of items) {
+    if (!it.stock_id) continue;
+    const cantRestaurar = it.cantidad_despachada || it.cantidad || 1;
+
+    // Obtener estado actual del stock
+    const { data: stockRow } = await sb.from('stock')
+      .select('id, cantidad, serie, sku').eq('id', it.stock_id).maybeSingle();
+
     if (stockRow) {
+      const nuevaCant = Number(stockRow.cantidad||0) + cantRestaurar;
       await sb.from('stock').update({
-        cantidad: Number(stockRow.cantidad) + cantRestaurar,
+        cantidad: nuevaCant,
         estado: 'DISPONIBLE',
         actualizado_en: new Date().toISOString()
       }).eq('id', it.stock_id);
+
+      // Registrar en kardex como INGRESO (reversión)
+      await sb.from('kardex').insert([{
+        stock_id: it.stock_id,
+        sku: it.sku || stockRow.sku,
+        tipo_movimiento: 'INGRESO',
+        cantidad: cantRestaurar,
+        referencia: `Reversión despacho #${despachoId}`,
+        observaciones: `Stock revertido. Serie: ${stockRow.serie||'—'}`,
+        fecha: new Date().toISOString(),
+      }]);
     }
-    // Kardex entrada por reversión
-    await sb.from('kardex').insert([{
-      stock_id: it.stock_id, sku: it.sku,
-      tipo_movimiento: 'ENTRADA',
-      cantidad: cantRestaurar,
-      referencia: `Reversión despacho ${despachoId}`,
-      usuario: null
-    }]);
   }
 
-  // Eliminar despacho
+  // Eliminar ítems y despacho
   await sb.from('despachos_items').delete().eq('despacho_id', despachoId);
   const { error } = await sb.from('despachos').delete().eq('id', despachoId);
   return { error };

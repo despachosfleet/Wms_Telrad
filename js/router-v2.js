@@ -17,12 +17,14 @@ const Router = {
 
   // Verifica si la vista activa tiene trabajo en progreso antes de navegar
   _confirmarSalida() {
+    // Siempre guardar estado — nunca preguntar ni perder datos
     const activeTab = this._tabs.find(t => t.id === this._activeTab);
     if (!activeTab) return true;
     const view = this._views[activeTab.name];
-    if (!view || typeof view.hasProgress !== 'function') return true;
-    if (!view.hasProgress()) return true;
-    return confirm('Tienes trabajo en progreso en esta ventana.\n¿Seguro que quieres salir? Los datos no guardados se perderán.');
+    if (view && typeof view.saveState === 'function') {
+      activeTab.state = view.saveState();
+    }
+    return true; // Siempre permitir navegar
   },
 
   // PC: abre o activa una pestaña. Móvil: navega normalmente

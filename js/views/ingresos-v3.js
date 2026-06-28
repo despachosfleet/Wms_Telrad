@@ -1338,20 +1338,50 @@ const IngresosView = {
     const codigo = document.getElementById('lpn-codigo-inp')?.value.trim().toUpperCase();
     const pedido = document.getElementById('sel-pedido-lpn')?.value || document.getElementById('lpn-pedido-manual')?.value.trim() || '';
     const gr     = document.getElementById('lpn-gr')?.value.trim()||'';
+    const tipo   = document.getElementById('lpn-tipo-ing')?.value||'';
     const msg    = document.getElementById('lpn-msg');
+
     if(!codigo){if(msg)msg.innerHTML='<span style="color:var(--danger-text);">Escanea o escribe el código LPN.</span>';return;}
     if(!pedido){if(msg)msg.innerHTML='<span style="color:var(--danger-text);">Selecciona o ingresa un N° de pedido.</span>';return;}
-    this._pedidoActual=pedido; this._gr=gr;
-    const {data,error}=await crearLPN({codigo,cliente:'',n_guia:gr,observaciones:pedido});
-    if(error && !String(error).includes('duplicate')){
-      if(msg)msg.innerHTML=`<span style="color:var(--danger-text);">Error: ${escapeHtml(String(error))}</span>`;return;
+    if(!tipo){if(msg)msg.innerHTML='<span style="color:var(--danger-text);">Selecciona el tipo de ingreso.</span>';return;}
+
+    // Verificar si el LPN ya tiene mercadería
+    if(msg)msg.innerHTML='<span style="color:var(--text-tertiary);">Verificando LPN...</span>';
+    const {data:lpnExist} = await sb.from('lpns').select('id,estado,codigo').eq('codigo',codigo).maybeSingle();
+
+    if(lpnExist){
+      // LPN existe — verificar si tiene ítems
+      const {count} = await sb.from('stock').select('*',{count:'exact',head:true}).eq('lpn_id',lpnExist.id);
+      if(count > 0){
+        if(msg)msg.innerHTML=`<span style="color:var(--danger-text);">⚠ LPN ${escapeHtml(codigo)} ya tiene ${count} ítem(s). ¿Deseas continuar agregando a este LPN?</span>
+          <button class="btn-secondary" style="font-size:11px;margin-left:8px;padding:3px 8px;" onclick="IngresosView._forzarActivarLPN('${codigo}','${escapeHtml(pedido)}','${escapeHtml(gr)}','${lpnExist.id}')">Sí, continuar</button>`;
+        return;
+      }
+      // LPN existe pero vacío — OK
+      this._lpnActual={id:lpnExist.id,codigo};
+      if(msg)msg.innerHTML=`<span style="color:var(--success-text);">✓ LPN ${escapeHtml(codigo)} está vacío — activado.</span>`;
+    } else {
+      // LPN nuevo — crear
+      const {data,error}=await crearLPN({codigo,cliente:'',n_guia:gr,observaciones:pedido});
+      if(error){if(msg)msg.innerHTML=`<span style="color:var(--danger-text);">Error: ${escapeHtml(String(error))}</span>`;return;}
+      this._lpnActual={id:data?.id,codigo};
+      if(msg)msg.innerHTML=`<span style="color:var(--success-text);">✓ LPN ${escapeHtml(codigo)} nuevo — activado.</span>`;
     }
-    this._lpnActual={id:data?.id,codigo};
+
+    this._pedidoActual=pedido; this._gr=gr; this._tipoIngreso=tipo;
     this._itemsLPN=[];
-    document.getElementById('btn-activar-lpn').textContent=`✓ LPN activo: ${codigo} — Cambiar`;
-    document.getElementById('btn-cerrar-lpn').style.display='none';
-    if(msg)msg.innerHTML=`<span style="color:var(--success-text);">✓ LPN ${escapeHtml(codigo)} activado. Pedido: ${escapeHtml(pedido)}</span>`;
-    document.getElementById('lpn-sku-search')?.focus();
+    document.getElementById('btn-activar-lpn').textContent=`✓ ${codigo}`;
+    this._renderItemsLPN();
+    document.getElementById('lpn-serie-rapido')?.focus();
+  },
+
+  async _forzarActivarLPN(codigo, pedido, gr, lpnId){
+    this._lpnActual={id:lpnId,codigo};
+    this._pedidoActual=pedido; this._gr=gr;
+    this._itemsLPN=[];
+    const msg=document.getElementById('lpn-msg');
+    if(msg)msg.innerHTML=`<span style="color:var(--warning);">⚠ Continuando en LPN ${escapeHtml(codigo)} con ítems previos.</span>`;
+    document.getElementById('btn-activar-lpn').textContent=`✓ ${codigo}`;
     this._renderItemsLPN();
   },
 
