@@ -1166,7 +1166,7 @@ async function registrarIngresosDesdeExcel(filas) {
     gr_ingreso: String(f.N_GUIA || '').trim() || null,
     fecha_ingreso: f.FECHA ? new Date(f.FECHA).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
     estado: 'DISPONIBLE',
-    tipo: null, // se puede inferir después
+    tipo: String(f.TIPO_INGRESO || f.tipo || 'INGRESO NUEVO').trim().toUpperCase(),
     condicion: String(f.TIPO_INGRESO || 'NUEVO').trim().toUpperCase(),
     observaciones: String(f.OBSERVACIONES || '').trim() || null,
     creado_en: new Date().toISOString(),

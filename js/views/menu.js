@@ -18,7 +18,8 @@ const MODULOS = [
     id: 'mod-almacen', label: 'Almacén',
     icono: '<svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
     subs: [
-      { nav: 'recepcion',   label: 'Recepción',   desc: 'Subir Excel de ingresos' },
+      { nav: 'ingresos',    label: 'Ingresos',    desc: 'Subir Excel o ingreso manual' },
+      { nav: 'recepcion',   label: 'Recepción',   desc: 'Pistolaje LPN en campo' },
       { nav: 'movimientos', label: 'Movimientos', desc: 'Mover ítems o paletas' },
       { nav: 'ubicaciones', label: 'Ubicaciones', desc: 'Ver y gestionar posiciones' },
     ]

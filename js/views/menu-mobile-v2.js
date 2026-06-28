@@ -5,6 +5,7 @@ const MenuMobileView = {
     const esAdmin = Auth.esAdmin();
     const modulos = [
       { nav:'picking-lista',    icon:'picking',    label:'Órdenes'     },
+      { nav:'ingresos',         icon:'recepcion',  label:'Ingresos'    },
       { nav:'recepcion',        icon:'recepcion',  label:'Recepción'   },
       { nav:'consulta',         icon:'consulta',   label:'Consultar'   },
       { nav:'movimientos',      icon:'mover',      label:'Movimientos' },
