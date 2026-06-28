@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<!-- build:20260625-v58 -->
+<title>Fleet WMS — Telrad</title>
+<link rel="stylesheet" href="css/style-v2.css">
+</head>
+<body>
+<!-- PANTALLA DE LOGIN -->
+<div id="app-login" style="display:none;">
+  <div id="login-root"></div>
+</div>
+
+<div id="app">
+
+  <header class="header">
+    <div class="header-inner">
+      <button id="btn-back" class="btn-icon" style="display:none;" aria-label="Volver">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="header-logo">▸ <span>Fleet WMS</span></div>
+      <h1 id="page-title" style="flex:1;"></h1>
+      <div class="header-actions">
+        <button class="btn-icon" id="btn-config" title="Apariencia">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06-.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+        <button class="btn-inicio" onclick="Router.navigate(window.innerWidth<640?'menu-mobile':'menu')" title="Inicio / Menú principal" id="btn-home-main">
+          <svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          <span>Inicio</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="config-panel" id="config-panel"></div>
+  <nav id="module-nav" class="module-nav"></nav>
+  <div id="module-dropdown-panel" class="module-dropdown-panel" style="display:none;"></div>
+
+  <!-- Barra de pestañas (solo PC) -->
+  <div class="tab-bar" id="tab-bar"></div>
+
+  <main id="main-content"></main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/utils.js?v=65"></script>
+<script src="js/supabase-client.js?v=65"></script>
+<script src="js/excel-matcher.js?v=65"></script>
+<script src="js/pdf-extractor.js?v=65"></script>
+<script src="js/scanner.js?v=65"></script>
+<script src="js/router-v2.js?v=65"></script>
+<script src="js/views/menu-v2.js?v=65"></script>
+<script src="js/views/nuevo-despacho.js?v=65"></script>
+<script src="js/views/validar-ordenes.js?v=65"></script>
+<script src="js/views/picking-v3.js?v=65"></script>
+<script src="js/views/ingresos-v3.js?v=65"></script>
+<script src="js/views/recepcion.js?v=65"></script>
+<script src="js/views/movimientos.js?v=65"></script>
+<script src="js/views/consulta-v3.js?v=65"></script>
+<script src="js/views/ubicaciones.js?v=65"></script>
+<script src="js/views/kardex.js?v=65"></script>
+<script src="js/views/registro-despachos.js?v=65"></script>
+<script src="js/auth.js?v=65"></script>
+<script src="js/views/login.js?v=65"></script>
+<script src="js/views/menu-mobile-v2.js?v=65"></script>
+<script src="js/views/admin.js?v=65"></script>
+<script src="js/app-v3.js?v=65"></script>
+<script>
+// Sincronizar clase has-tabs en body según si hay pestañas visibles
+const _tabObs = new MutationObserver(() => {
+  const bar = document.getElementById('tab-bar');
+  document.body.classList.toggle('has-tabs', bar && bar.style.display !== 'none' && bar.children.length > 0);
+});
+document.addEventListener('DOMContentLoaded', () => {
+  const bar = document.getElementById('tab-bar');
+  if (bar) _tabObs.observe(bar, {childList:true, attributes:true, attributeFilter:['style']});
+  document.getElementById('btn-config')?.addEventListener('click', e => { e.stopPropagation(); toggleConfigPanel(); });
+});
+</script>
+</body>
+</html>
+<!-- Fri Jun 26 00:47:00 UTC 2026 -->
