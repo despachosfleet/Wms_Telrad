@@ -11,12 +11,14 @@ const RecepcionView = {
   title: 'Recepción',
   _flujo: null,
   _preview: [],
-  _lpnActual: null,   // { id, codigo }
-  _itemsLPN: [],      // ítems pistoleados en el LPN activo
-  _pedidoActual: '',  // número de pedido activo
-  _grActual: '',      // GR activa
+  _lpnActual: null,
+  _itemsLPN: [],
+  _pedidoActual: '',
+  _grActual: '',
   _manualItems: [],
-  _sesionItems: [],   // todos los ítems de la sesión (varios LPNs)
+  _sesionItems: [],
+  _cadenaOrdenes: null,   // Map de pedidos del Excel de cadena
+  _pedidoSeleccionado: null, // pedido activo para pistolaje
 
   hasProgress() {
     return (
@@ -115,6 +117,42 @@ const RecepcionView = {
     return `<button class="btn-secondary" id="btn-volver-recep" style="margin-bottom:12px;">← Volver</button>`;
   },
 
+  _renderItemsEsperados() {
+    if (!this._pedidoSeleccionado || !this._cadenaOrdenes) return '';
+    const orden = this._cadenaOrdenes.get(this._pedidoSeleccionado);
+    if (!orden?.items?.length) return '<p style="font-size:11px;color:var(--text-tertiary);">Sin ítems en este pedido.</p>';
+
+    const itemsLPNSkus = this._itemsLPN.map(i=>i.SERIE||i.MATERIAL);
+
+    return `
+      <p style="font-size:10px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;margin-bottom:4px;">
+        Ítems esperados — ${orden.items.length}
+      </p>
+      <div style="display:flex;flex-direction:column;gap:3px;">
+        ${orden.items.map(it=>{
+          const recibido = this._itemsLPN.some(i=>
+            (it.serie && i.SERIE && i.SERIE.toUpperCase()===it.serie.toUpperCase()) ||
+            (!it.serie && i.MATERIAL===it.sku)
+          );
+          return `
+            <div style="display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:4px;
+              background:${recibido?'var(--success-bg)':'var(--bg-row-alt)'};">
+              <span style="font-size:14px;">${recibido?'✅':'⬜'}</span>
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:11px;font-weight:700;font-family:monospace;">${escapeHtml(it.sku||'')}</div>
+                <div style="font-size:10px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(it.descripcion||'')}</div>
+              </div>
+              <div style="text-align:right;flex-shrink:0;">
+                <div style="font-size:11px;font-weight:700;">${it.cantidad||1}</div>
+                ${it.serie?`<div style="font-size:9px;color:var(--text-tertiary);font-family:monospace;">${escapeHtml(it.serie)}</div>`:''}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  },
+
   _bindVolver(c) {
     document.getElementById('btn-volver-recep')?.addEventListener('click', () => {
       this._flujo = null; this._lpnActual = null;
@@ -130,6 +168,40 @@ const RecepcionView = {
   _renderLPN(c) {
     c.innerHTML = `
       ${this._btnVolver()}
+
+      <!-- Paso 0: Subir Excel de cadena (si no está cargado) -->
+      <div class="card" style="margin-bottom:8px;padding:10px 12px;" id="panel-cadena">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;">
+          <div>
+            <p class="card-title" style="margin:0;">
+              ${this._cadenaOrdenes ? '✓ Excel cargado — ' + this._cadenaOrdenes.size + ' pedido(s)' : '1. Cargar Excel de cadena de suministro'}
+            </p>
+            ${this._cadenaOrdenes ? '<p style="font-size:11px;color:var(--success-text);margin:2px 0 0;">Selecciona el pedido para ver los ítems esperados</p>' :
+              '<p style="font-size:11px;color:var(--text-tertiary);margin:2px 0 0;">El Excel de programación con los ítems esperados</p>'}
+          </div>
+          <div style="display:flex;gap:6px;">
+            ${this._cadenaOrdenes ? '<button class="btn-ghost" id="btn-cambiar-cadena" style="font-size:11px;padding:4px 10px;">Cambiar Excel</button>' :
+              '<button class="btn-secondary" id="btn-cargar-cadena" style="font-size:11px;padding:5px 12px;">📊 Subir Excel</button>'}
+          </div>
+        </div>
+        <input type="file" id="input-cadena-recep" accept=".xlsx,.xls" style="display:none;">
+
+        <!-- Selector de pedido si hay cadena cargada -->
+        ${this._cadenaOrdenes ? `
+          <div style="margin-top:8px;">
+            <label style="font-size:9px;text-transform:uppercase;color:var(--text-tertiary);">Selecciona el pedido a recepcionar</label>
+            <select id="sel-pedido-cadena" style="width:100%;font-size:12px;padding:5px 7px;margin-top:3px;">
+              <option value="">— Seleccionar pedido —</option>
+              ${[...this._cadenaOrdenes.keys()].map(p=>`<option value="${escapeHtml(p)}" ${this._pedidoSeleccionado===p?'selected':''}>${escapeHtml(p)}</option>`).join('')}
+            </select>
+          </div>
+          ${this._pedidoSeleccionado ? `
+            <div id="panel-items-esperados" style="margin-top:8px;max-height:200px;overflow-y:auto;">
+              ${this._renderItemsEsperados()}
+            </div>
+          ` : ''}
+        ` : ''}
+      </div>
 
       <!-- Header de sesión: LPN activo + Pedido + GR -->
       <div class="card" style="margin-bottom:8px;padding:10px 12px;">
@@ -238,6 +310,48 @@ const RecepcionView = {
   },
 
   _bindLPNEventos() {
+    // Cargar Excel de cadena
+    document.getElementById('btn-cargar-cadena')?.addEventListener('click', ()=>
+      document.getElementById('input-cadena-recep')?.click());
+    document.getElementById('btn-cambiar-cadena')?.addEventListener('click', ()=>
+      document.getElementById('input-cadena-recep')?.click());
+    document.getElementById('input-cadena-recep')?.addEventListener('change', async (e)=>{
+      if (!e.target.files[0]) return;
+      const ordenes = await extraerTodasLasOrdenes(e.target.files[0]);
+      // Convertir a mapa por PEDIDO (no por GR)
+      const porPedido = new Map();
+      for (const [gr, orden] of ordenes) {
+        for (const item of orden.items) {
+          const ped = item.pedido_pallet || gr;
+          if (!porPedido.has(ped)) porPedido.set(ped, { pedido: ped, gr, items: [] });
+          porPedido.get(ped).items.push(item);
+        }
+      }
+      this._cadenaOrdenes = porPedido;
+      this._pedidoSeleccionado = null;
+      const c2 = document.getElementById('recep-contenido');
+      if (c2) this._renderLPN(c2);
+    });
+
+    // Selector de pedido
+    document.getElementById('sel-pedido-cadena')?.addEventListener('change', (e)=>{
+      this._pedidoSeleccionado = e.target.value || null;
+      if (this._pedidoSeleccionado) {
+        const orden = this._cadenaOrdenes?.get(this._pedidoSeleccionado);
+        this._pedidoActual = this._pedidoSeleccionado;
+        this._grActual = orden?.gr || '';
+        // Actualizar campos de pedido/GR
+        const ipPed = document.getElementById('lpn-pedido');
+        const ipGR  = document.getElementById('lpn-gr');
+        if (ipPed) ipPed.value = this._pedidoActual;
+        if (ipGR)  ipGR.value  = this._grActual;
+      }
+      // Re-render del panel de ítems esperados
+      const panel = document.getElementById('panel-items-esperados');
+      if (panel) panel.innerHTML = this._pedidoSeleccionado ? this._renderItemsEsperados() : '';
+      else { const c2 = document.getElementById('recep-contenido'); if(c2) this._renderLPN(c2); }
+    });
+
     // Escanear LPN del rollo
     document.getElementById('btn-escanear-lpn')?.addEventListener('click', () => {
       abrirEscaner('recep-contenido', (txt) => {
@@ -421,6 +535,9 @@ const RecepcionView = {
     const btnCerrar = document.getElementById('btn-cerrar-lpn');
     if (count) count.textContent = this._itemsLPN.length;
     if (btnCerrar) btnCerrar.style.display = this._lpnActual && this._itemsLPN.length > 0 ? '' : 'none';
+    // Refrescar panel de ítems esperados
+    const panelEsp = document.getElementById('panel-items-esperados');
+    if (panelEsp && this._pedidoSeleccionado) panelEsp.innerHTML = this._renderItemsEsperados();
 
     if (!lista) return;
     if (!this._itemsLPN.length) {
