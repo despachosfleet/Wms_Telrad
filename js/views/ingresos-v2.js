@@ -543,7 +543,7 @@ const IngresosView = {
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
           <label style="display:inline-flex;align-items:center;gap:6px;padding:5px 10px;
             border:1px solid var(--border-strong);border-radius:6px;cursor:pointer;font-size:11px;">
-            📊 ${this._cadenaOrdenes ? 'Cambiar Excel cadena' : 'Cargar Excel cadena (opcional)'}
+            📊 ${this._cadenaOrdenes ? 'Cambiar Excel de referencia' : 'Cargar Excel de referencia (opcional)'}
             <input type="file" id="input-cadena-lpn" accept=".xlsx,.xls" style="display:none;">
           </label>
           ${this._cadenaOrdenes ? `<span style="font-size:11px;color:var(--success-text);">✓ ${this._cadenaOrdenes.size} pedido(s) cargados</span>` : ''}
@@ -706,22 +706,42 @@ const IngresosView = {
   },
 
   _bindLPNEventos(){
-    // Excel cadena
+    // Excel referencia — mismo formato que Subir Excel (Sharepoint)
+    // FECHA | N°PEDIDO | MATERIAL | DESCRIPCION | SERIE | CANTIDAD | N°GUIA
     document.getElementById('input-cadena-lpn')?.addEventListener('change',async e=>{
       if(!e.target.files[0])return;
-      const ordenes = await extraerTodasLasOrdenes(e.target.files[0]);
-      // Agrupar por pedido
-      const porPedido = new Map();
-      for(const [gr, orden] of ordenes){
-        for(const item of orden.items){
-          const ped = item.pedido_pallet || gr;
-          if(!porPedido.has(ped)) porPedido.set(ped,{pedido:ped,gr,items:[]});
-          porPedido.get(ped).items.push(item);
+      try {
+        await cargarXlsx();
+        const buf = await e.target.files[0].arrayBuffer();
+        const wb  = XLSX.read(buf, {type:'array', cellDates:true});
+        let filas = [];
+        for(const nombre of wb.SheetNames){
+          const ws = wb.Sheets[nombre];
+          const data = XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
+          if(data.length>1){filas=data;break;}
         }
-      }
-      this._cadenaOrdenes = porPedido;
-      this._pedidoActual  = '';
-      this._renderLPN(document.getElementById('ing-contenido'));
+        const fila0 = filas[0]||[];
+        const esHdr = ['FECHA','MATERIAL','PEDIDO','SKU','SERIE'].some(k=>fila0.some(v=>String(v).toUpperCase().includes(k)));
+        const inicio = esHdr?1:0;
+
+        // Agrupar por pedido
+        const porPedido = new Map();
+        filas.slice(inicio).filter(r=>r.some(v=>v!=='')).forEach(r=>{
+          const ped  = String(r[1]||'').trim();
+          const sku  = String(r[2]||'').trim().toUpperCase();
+          const desc = String(r[3]||'').trim();
+          const serie= String(r[4]||'').trim();
+          const cant = Number(String(r[5]).replace(/,/g,''))||1;
+          const gr   = String(r[6]||'').trim();
+          if(!sku||!cant) return;
+          if(!porPedido.has(ped)) porPedido.set(ped,{pedido:ped,gr,items:[]});
+          porPedido.get(ped).items.push({sku,descripcion:desc,serie,cantidad:cant,gr});
+        });
+
+        this._cadenaOrdenes = porPedido;
+        this._pedidoActual  = '';
+        this._renderLPN(document.getElementById('ing-contenido'));
+      } catch(err){ alert('Error leyendo Excel: '+err.message); }
     });
 
     // Selector pedido
@@ -908,8 +928,16 @@ const IngresosView = {
     if(!this._itemsLPN.length){alert('Agrega ítems antes de cerrar el LPN.');return;}
     const btn=document.getElementById('btn-cerrar-lpn');
     if(btn){btn.disabled=true;btn.textContent='Guardando…';}
+    // Registrar ítems en LPN y marcar ubicación como RECEPCION
     const {error,count}=await registrarItemsEnLPN(this._lpnActual.id,this._lpnActual.codigo,this._itemsLPN);
     if(error){if(btn){btn.disabled=false;btn.textContent='Cerrar LPN ✓';}alert('Error: '+error);return;}
+    // Marcar LPN en zona RECEPCION
+    try {
+      await sb.from('lpns').update({
+        estado:'RECEPCION',
+        ubicacion:'RECEPCION'
+      }).eq('id',this._lpnActual.id);
+    } catch(e){}
     this._sesionItems.push(...this._itemsLPN.map(i=>({...i,_lpn:this._lpnActual.codigo})));
     this._itemsLPN=[]; this._lpnActual=null;
     document.getElementById('btn-activar-lpn').textContent='Activar LPN';
@@ -919,7 +947,7 @@ const IngresosView = {
     this._renderSesion();
     document.getElementById('lpn-sesion').style.display='';
     const msg=document.getElementById('lpn-msg');
-    if(msg)msg.innerHTML=`<span style="color:var(--success-text);">✓ LPN cerrado — ${count} ítem(s) guardados. Activa otro LPN para continuar.</span>`;
+    if(msg)msg.innerHTML=`<span style="color:var(--success-text);">✓ LPN ${this._sesionItems.slice(-count).map(i=>i._lpn)[0]||''} en zona RECEPCIÓN — ${count} ítem(s) guardados.</span>`;
   },
 
   _renderSesion(){
