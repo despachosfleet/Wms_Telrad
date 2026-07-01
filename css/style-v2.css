@@ -296,6 +296,25 @@ main{padding-top:calc(var(--header-h) + var(--nav-h));padding-bottom:32px;min-he
 .progress-bar{height:4px;background:var(--border);border-radius:2px;overflow:hidden;}
 .progress-bar-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .4s;}
 
+/* PISTOLAJE LPN — shell a pantalla completa (respeta header/nav/tabs reales) */
+.pist-shell{
+  display:flex;flex-direction:column;
+  height:calc(100vh - var(--header-h) - var(--nav-h));
+  margin:0 0 -32px;overflow:hidden;
+}
+.has-tabs .pist-shell{height:calc(100vh - var(--header-h) - var(--nav-h) - var(--tab-h));}
+.pist-shell-bar{flex-shrink:0;}
+.pist-split{flex:1;min-height:0;display:grid;grid-template-columns:1.4fr 1fr;gap:12px;padding:0 0 12px;}
+.pist-panel{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);display:flex;flex-direction:column;min-height:0;overflow:hidden;box-shadow:var(--shadow-sm);}
+.pist-panel-head{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.pist-panel-body{flex:1;min-height:0;overflow-y:auto;}
+.pist-bottombar{flex-shrink:0;}
+@media (max-width:900px){
+  .pist-shell{height:auto;overflow:visible;margin:0;}
+  .pist-split{display:flex;flex-direction:column;}
+  .pist-panel{max-height:60vh;}
+}
+
 /* PICKING ITEMS */
 .pick-item{background:var(--bg-card);border:1px solid var(--border);border-left:4px solid var(--border);border-radius:var(--radius);padding:11px 13px;margin-bottom:7px;cursor:pointer;transition:border-color .15s,box-shadow .15s;box-shadow:var(--shadow-sm);}
 .pick-item:hover{box-shadow:var(--shadow);}
