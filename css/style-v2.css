@@ -296,11 +296,13 @@ main{padding-top:calc(var(--header-h) + var(--nav-h));padding-bottom:32px;min-he
 .progress-bar{height:4px;background:var(--border);border-radius:2px;overflow:hidden;}
 .progress-bar-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .4s;}
 
-/* PISTOLAJE LPN — shell a pantalla completa (respeta header/nav/tabs reales) */
+/* PISTOLAJE LPN — shell a pantalla completa (respeta header/nav reales, ignora el max-width de .page-inner) */
 .pist-shell{
   display:flex;flex-direction:column;
   height:calc(100vh - var(--header-h) - var(--nav-h));
-  margin:0 0 -32px;overflow:hidden;
+  width:100vw;position:relative;left:50%;right:50%;margin-left:-50vw;margin-right:-50vw;
+  padding:0 20px;box-sizing:border-box;
+  margin-top:0;margin-bottom:-32px;overflow:hidden;
 }
 .has-tabs .pist-shell{height:calc(100vh - var(--header-h) - var(--nav-h) - var(--tab-h));}
 .pist-shell-bar{flex-shrink:0;}
@@ -310,7 +312,7 @@ main{padding-top:calc(var(--header-h) + var(--nav-h));padding-bottom:32px;min-he
 .pist-panel-body{flex:1;min-height:0;overflow-y:auto;}
 .pist-bottombar{flex-shrink:0;}
 @media (max-width:900px){
-  .pist-shell{height:auto;overflow:visible;margin:0;}
+  .pist-shell{height:auto;overflow:visible;width:100%;left:0;right:0;margin:0;padding:0;}
   .pist-split{display:flex;flex-direction:column;}
   .pist-panel{max-height:60vh;}
 }
