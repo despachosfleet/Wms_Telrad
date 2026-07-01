@@ -311,6 +311,11 @@ main{padding-top:calc(var(--header-h) + var(--nav-h));padding-bottom:32px;min-he
 .pist-panel-head{padding:8px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0;}
 .pist-panel-body{flex:1;min-height:0;overflow-y:auto;}
 .pist-bottombar{flex-shrink:0;}
+#pist-kpi-strip > div{margin-bottom:6px !important;gap:8px !important;}
+#pist-kpi-strip .stat-card{padding:5px 9px !important;}
+#pist-kpi-strip .stat-value{font-size:15px !important;}
+#pist-kpi-strip .stat-label{font-size:8px !important;margin-top:0 !important;}
+#pist-kpi-strip .progress-bar{margin-top:4px !important;}
 @media (max-width:900px){
   .pist-shell{height:auto;overflow:visible;width:100%;left:0;right:0;margin:0;padding:0;}
   .pist-split{display:flex;flex-direction:column;}

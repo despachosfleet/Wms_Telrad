@@ -289,53 +289,43 @@ const IngresosView = {
 
     c.innerHTML = `
       <div class="pist-shell">
-      <!-- Barra 1: volver + toggle vista + meta -->
-      <div class="pist-shell-bar card" style="padding:7px 12px;margin-bottom:6px;">
+      <!-- Barra 1+2 fusionadas: volver+toggle+meta / pedido+lpn -->
+      <div class="pist-shell-bar card" style="padding:7px 12px 8px;margin-bottom:6px;">
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
           <button class="btn-secondary" id="btn-volver-recep" style="font-size:11px;padding:5px 9px;">← Volver</button>
           <div style="display:flex;background:var(--bg-row-alt);border:1px solid var(--border);border-radius:9px;padding:3px;gap:3px;">
             <button id="pist-btn-bandeja" style="border:none;cursor:pointer;font-size:12px;font-weight:700;padding:5px 12px;border-radius:6px;background:${this._pistView==='bandeja'?'var(--accent)':'transparent'};color:${this._pistView==='bandeja'?'#fff':'var(--text-secondary)'};">🗂 Bandeja masiva</button>
             <button id="pist-btn-sku" style="border:none;cursor:pointer;font-size:12px;font-weight:700;padding:5px 12px;border-radius:6px;background:${this._pistView==='sku'?'var(--accent)':'transparent'};color:${this._pistView==='sku'?'#fff':'var(--text-secondary)'};">▦ Por SKU</button>
           </div>
-          <span style="font-size:11px;color:var(--success-text);">✓ Excel cargado — ${peds.length} pedido(s)</span>
+          <span style="font-size:11px;color:var(--success-text);">✓ ${peds.length} pedido(s)</span>
           <button class="btn-ghost" id="pist-btn-cambiar-excel" style="font-size:11px;">Cambiar Excel</button>
           <div style="flex:1"></div>
-          <div style="display:flex;align-items:center;gap:6px;"><span style="font-size:11px;font-weight:600;color:var(--text-tertiary);">Fecha</span><input type="date" id="pist-fecha" value="${this._pistFecha}" style="font-family:monospace;font-size:11px;padding:4px 6px;border:1px solid var(--border-strong);border-radius:6px;background:var(--bg-input);color:var(--text);"></div>
-          <div style="display:flex;align-items:center;gap:6px;"><span style="font-size:11px;font-weight:600;color:var(--text-tertiary);">Cliente</span><select id="pist-cliente" style="font-size:11px;padding:4px 6px;">
+          <div style="display:flex;align-items:center;gap:5px;"><span style="font-size:11px;font-weight:600;color:var(--text-tertiary);">Fecha</span><input type="date" id="pist-fecha" value="${this._pistFecha}" style="font-family:monospace;font-size:11px;padding:3px 5px;border:1px solid var(--border-strong);border-radius:6px;background:var(--bg-input);color:var(--text);"></div>
+          <div style="display:flex;align-items:center;gap:5px;"><span style="font-size:11px;font-weight:600;color:var(--text-tertiary);">Cliente</span><select id="pist-cliente" style="font-size:11px;padding:3px 5px;">
             <option value="">Cliente…</option>
             ${['ENTEL','CLARO','TELRAD','STP PARRES','AMERICATEL'].map(cl=>`<option ${this._pistCliente===cl?'selected':''}>${cl}</option>`).join('')}
           </select></div>
-          <div style="display:flex;align-items:center;gap:6px;"><span style="font-size:11px;font-weight:600;color:var(--text-tertiary);">Condición</span><select id="pist-condicion" style="font-size:11px;padding:4px 6px;">
+          <div style="display:flex;align-items:center;gap:5px;"><span style="font-size:11px;font-weight:600;color:var(--text-tertiary);">Cond.</span><select id="pist-condicion" style="font-size:11px;padding:3px 5px;">
             ${['NUEVO','DESMONTADO','DEVOLUCION','EXCEDENTE'].map(cv=>`<option ${this._pistCondicion===cv?'selected':''}>${cv}</option>`).join('')}
           </select></div>
         </div>
-      </div>
-
-      <!-- Barra 2: LPN + PEDIDO -->
-      <div class="pist-shell-bar card" style="padding:8px 12px;margin-bottom:6px;">
-        <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;">
-          <div class="field" style="margin:0;min-width:150px;">
-            <label>Pedido</label>
-            <select id="pist-sel-pedido" style="font-family:monospace;font-weight:700;">
-              ${peds.map(p=>{const st=this._pistStats(p); return `<option value="${escapeHtml(p)}" ${this._pistSelectedPedido===p?'selected':''}>${escapeHtml(p)} · ${st.d}/${st.t}</option>`;}).join('')}
-            </select>
-          </div>
-          <div class="field" style="margin:0;width:150px;">
-            <label>N° Guía</label>
-            <input type="text" id="pist-guia" value="${escapeHtml(this._pistCurGuia())}" placeholder="T022-00381" style="font-family:monospace;">
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;background:var(--bg-row-alt);border:1px solid var(--border);border-radius:9px;padding:6px 9px;">
-            <span style="font-size:9px;font-weight:800;letter-spacing:.4px;color:var(--text-tertiary);text-transform:uppercase;">LPN paleta</span>
-            <input type="text" id="pist-lpn-input" placeholder="escanea / escribe LPN…" value="${this._pistLpnInput}" style="font-family:monospace;font-size:13px;font-weight:700;border:1.5px solid var(--border-strong);border-radius:8px;padding:6px 9px;outline:none;width:130px;text-transform:uppercase;background:var(--bg-input);color:var(--text);">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:7px;padding-top:7px;border-top:1px solid var(--border);">
+          <div style="display:flex;align-items:center;gap:6px;"><span style="font-size:11px;font-weight:600;color:var(--text-tertiary);">Pedido</span><select id="pist-sel-pedido" style="font-family:monospace;font-weight:700;font-size:12px;padding:4px 6px;">
+            ${peds.map(p=>{const st=this._pistStats(p); return `<option value="${escapeHtml(p)}" ${this._pistSelectedPedido===p?'selected':''}>${escapeHtml(p)} · ${st.d}/${st.t}</option>`;}).join('')}
+          </select></div>
+          <div style="display:flex;align-items:center;gap:6px;"><span style="font-size:11px;font-weight:600;color:var(--text-tertiary);">Guía</span><input type="text" id="pist-guia" value="${escapeHtml(this._pistCurGuia())}" placeholder="T022-00381" style="font-family:monospace;font-size:12px;padding:4px 6px;width:120px;border:1px solid var(--border-strong);border-radius:6px;background:var(--bg-input);color:var(--text);"></div>
+          <div style="display:flex;align-items:center;gap:8px;background:var(--bg-row-alt);border:1px solid var(--border);border-radius:9px;padding:5px 8px;">
+            <span style="font-size:9px;font-weight:800;letter-spacing:.4px;color:var(--text-tertiary);text-transform:uppercase;">LPN</span>
+            <input type="text" id="pist-lpn-input" placeholder="escanea / escribe LPN…" value="${this._pistLpnInput}" style="font-family:monospace;font-size:12px;font-weight:700;border:1.5px solid var(--border-strong);border-radius:8px;padding:5px 8px;outline:none;width:120px;text-transform:uppercase;background:var(--bg-input);color:var(--text);">
             <span id="pist-lpn-cand"></span>
             <span id="pist-lpn-badge"></span>
-            <button class="btn-secondary" id="pist-btn-buscar-vacio" style="font-size:11px;padding:6px 9px;">🔎 Buscar vacío</button>
-            <button class="btn-secondary" id="pist-btn-generar-lpn" style="font-size:11px;padding:6px 9px;">⚙ Generar</button>
+            <button class="btn-secondary" id="pist-btn-buscar-vacio" style="font-size:11px;padding:5px 8px;">🔎 Vacío</button>
+            <button class="btn-secondary" id="pist-btn-generar-lpn" style="font-size:11px;padding:5px 8px;">⚙ Generar</button>
             ${this._pistPrintedLpns.length>1?`<select id="pist-lpn-select" style="font-family:monospace;font-size:11px;">${this._pistPrintedLpns.map(cd=>`<option value="${cd}" ${this._pistLpn===cd?'selected':''}>${cd}</option>`).join('')}</select>`:''}
           </div>
           <div style="flex:1"></div>
-          <button class="btn-secondary" id="pist-btn-add-sku" style="font-size:12px;">+ SKU al pedido</button>
-          <button class="btn-primary" id="pist-btn-add-pedido" style="font-size:12px;">+ Nuevo pedido</button>
+          <button class="btn-secondary" id="pist-btn-add-sku" style="font-size:11px;padding:5px 9px;">+ SKU</button>
+          <button class="btn-primary" id="pist-btn-add-pedido" style="font-size:11px;padding:5px 9px;">+ Nuevo pedido</button>
         </div>
       </div>
 
@@ -343,7 +333,7 @@ const IngresosView = {
 
       ${this._pistView==='bandeja' ? `
         <div class="pist-shell-bar" style="padding:2px 0 6px;display:flex;align-items:center;gap:12px;">
-          <input type="text" id="pist-scan" placeholder="Pistolea las series de corrido (de cualquier pedido) — caen a la bandeja y el sistema sugiere su SKU…" style="flex:1;font-family:monospace;font-size:14px;font-weight:600;padding:9px 12px;border:2px solid var(--accent);border-radius:9px;outline:none;background:var(--bg-input);color:var(--text);box-shadow:0 0 0 4px var(--accent-dim);" autofocus>
+          <input type="text" id="pist-scan" placeholder="Pistolea las series de corrido (de cualquier pedido) — caen a la bandeja y el sistema sugiere su SKU…" style="flex:1;font-family:monospace;font-size:14px;font-weight:600;padding:8px 12px;border:2px solid var(--accent);border-radius:9px;outline:none;background:var(--bg-input);color:var(--text);box-shadow:0 0 0 4px var(--accent-dim);" autofocus>
           <div id="pist-fb" style="min-width:260px;max-width:380px;"></div>
         </div>
         <div class="pist-split">
@@ -375,13 +365,13 @@ const IngresosView = {
       `}
 
       <!-- BARRA INFERIOR -->
-      <div class="pist-bottombar card" style="padding:10px 12px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-        <div style="font-size:12px;color:var(--text-secondary);">Recepción total <strong id="pist-global" style="font-family:monospace;color:var(--text);"></strong></div>
-        <div style="font-size:12px;color:var(--text-tertiary);"><strong id="pist-pool-count" style="font-family:monospace;"></strong> en bandeja</div>
-        <div style="font-size:12px;color:var(--text-tertiary);"><strong id="pist-pend-count" style="font-family:monospace;"></strong> por guardar</div>
+      <div class="pist-bottombar card" style="padding:7px 12px;margin-bottom:0;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+        <div style="font-size:11px;color:var(--text-secondary);">Recepción total <strong id="pist-global" style="font-family:monospace;color:var(--text);"></strong></div>
+        <div style="font-size:11px;color:var(--text-tertiary);"><strong id="pist-pool-count" style="font-family:monospace;"></strong> en bandeja</div>
+        <div style="font-size:11px;color:var(--text-tertiary);"><strong id="pist-pend-count" style="font-family:monospace;"></strong> por guardar</div>
         <div style="flex:1"></div>
-        <button class="btn-secondary" id="pist-btn-guardar">💾 Guardar avance</button>
-        <button class="btn-primary" id="pist-btn-exportar">⬇ Exportar recepción</button>
+        <button class="btn-secondary" id="pist-btn-guardar" style="font-size:12px;padding:6px 11px;">💾 Guardar avance</button>
+        <button class="btn-primary" id="pist-btn-exportar" style="font-size:12px;padding:6px 11px;">⬇ Exportar recepción</button>
       </div>
 
       <div id="pist-modal-root"></div>
