@@ -308,7 +308,7 @@ main{padding-top:calc(var(--header-h) + var(--nav-h));padding-bottom:32px;min-he
 .pist-shell-bar{flex-shrink:0;}
 .pist-split{flex:1;min-height:0;display:grid;grid-template-columns:1.4fr 1fr;gap:12px;padding:0 0 12px;}
 .pist-panel{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);display:flex;flex-direction:column;min-height:0;overflow:hidden;box-shadow:var(--shadow-sm);}
-.pist-panel-head{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.pist-panel-head{padding:8px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0;}
 .pist-panel-body{flex:1;min-height:0;overflow-y:auto;}
 .pist-bottombar{flex-shrink:0;}
 @media (max-width:900px){

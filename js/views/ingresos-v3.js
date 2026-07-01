@@ -290,38 +290,29 @@ const IngresosView = {
     c.innerHTML = `
       <div class="pist-shell">
       <!-- Barra 1: volver + toggle vista + meta -->
-      <div class="pist-shell-bar card" style="padding:8px 12px;margin-bottom:8px;">
+      <div class="pist-shell-bar card" style="padding:7px 12px;margin-bottom:6px;">
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <button class="btn-secondary" id="btn-volver-recep" style="font-size:11px;padding:6px 10px;">← Volver</button>
+          <button class="btn-secondary" id="btn-volver-recep" style="font-size:11px;padding:5px 9px;">← Volver</button>
           <div style="display:flex;background:var(--bg-row-alt);border:1px solid var(--border);border-radius:9px;padding:3px;gap:3px;">
-            <button id="pist-btn-bandeja" style="border:none;cursor:pointer;font-size:12px;font-weight:700;padding:6px 13px;border-radius:6px;background:${this._pistView==='bandeja'?'var(--accent)':'transparent'};color:${this._pistView==='bandeja'?'#fff':'var(--text-secondary)'};">🗂 Bandeja masiva</button>
-            <button id="pist-btn-sku" style="border:none;cursor:pointer;font-size:12px;font-weight:700;padding:6px 13px;border-radius:6px;background:${this._pistView==='sku'?'var(--accent)':'transparent'};color:${this._pistView==='sku'?'#fff':'var(--text-secondary)'};">▦ Por SKU</button>
+            <button id="pist-btn-bandeja" style="border:none;cursor:pointer;font-size:12px;font-weight:700;padding:5px 12px;border-radius:6px;background:${this._pistView==='bandeja'?'var(--accent)':'transparent'};color:${this._pistView==='bandeja'?'#fff':'var(--text-secondary)'};">🗂 Bandeja masiva</button>
+            <button id="pist-btn-sku" style="border:none;cursor:pointer;font-size:12px;font-weight:700;padding:5px 12px;border-radius:6px;background:${this._pistView==='sku'?'var(--accent)':'transparent'};color:${this._pistView==='sku'?'#fff':'var(--text-secondary)'};">▦ Por SKU</button>
           </div>
           <span style="font-size:11px;color:var(--success-text);">✓ Excel cargado — ${peds.length} pedido(s)</span>
           <button class="btn-ghost" id="pist-btn-cambiar-excel" style="font-size:11px;">Cambiar Excel</button>
           <div style="flex:1"></div>
-          <div style="display:flex;flex-direction:column;gap:2px;">
-            <label style="font-size:9px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--text-tertiary);">Fecha</label>
-            <input type="date" id="pist-fecha" value="${this._pistFecha}" style="font-family:monospace;font-size:11px;padding:5px 7px;border:1px solid var(--border-strong);border-radius:6px;background:var(--bg-input);color:var(--text);">
-          </div>
-          <div style="display:flex;flex-direction:column;gap:2px;">
-            <label style="font-size:9px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--text-tertiary);">Cliente</label>
-            <select id="pist-cliente" style="font-size:11px;padding:5px 7px;">
-              <option value="">Cliente…</option>
-              ${['ENTEL','CLARO','TELRAD','STP PARRES','AMERICATEL'].map(cl=>`<option ${this._pistCliente===cl?'selected':''}>${cl}</option>`).join('')}
-            </select>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:2px;">
-            <label style="font-size:9px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--text-tertiary);">Condición</label>
-            <select id="pist-condicion" style="font-size:11px;padding:5px 7px;">
-              ${['NUEVO','DESMONTADO','DEVOLUCION','EXCEDENTE'].map(cv=>`<option ${this._pistCondicion===cv?'selected':''}>${cv}</option>`).join('')}
-            </select>
-          </div>
+          <div style="display:flex;align-items:center;gap:6px;"><span style="font-size:11px;font-weight:600;color:var(--text-tertiary);">Fecha</span><input type="date" id="pist-fecha" value="${this._pistFecha}" style="font-family:monospace;font-size:11px;padding:4px 6px;border:1px solid var(--border-strong);border-radius:6px;background:var(--bg-input);color:var(--text);"></div>
+          <div style="display:flex;align-items:center;gap:6px;"><span style="font-size:11px;font-weight:600;color:var(--text-tertiary);">Cliente</span><select id="pist-cliente" style="font-size:11px;padding:4px 6px;">
+            <option value="">Cliente…</option>
+            ${['ENTEL','CLARO','TELRAD','STP PARRES','AMERICATEL'].map(cl=>`<option ${this._pistCliente===cl?'selected':''}>${cl}</option>`).join('')}
+          </select></div>
+          <div style="display:flex;align-items:center;gap:6px;"><span style="font-size:11px;font-weight:600;color:var(--text-tertiary);">Condición</span><select id="pist-condicion" style="font-size:11px;padding:4px 6px;">
+            ${['NUEVO','DESMONTADO','DEVOLUCION','EXCEDENTE'].map(cv=>`<option ${this._pistCondicion===cv?'selected':''}>${cv}</option>`).join('')}
+          </select></div>
         </div>
       </div>
 
       <!-- Barra 2: LPN + PEDIDO -->
-      <div class="pist-shell-bar card" style="padding:10px 12px;margin-bottom:8px;">
+      <div class="pist-shell-bar card" style="padding:8px 12px;margin-bottom:6px;">
         <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;">
           <div class="field" style="margin:0;min-width:150px;">
             <label>Pedido</label>
@@ -349,11 +340,11 @@ const IngresosView = {
       </div>
 
       <div id="pist-kpi-strip" class="pist-shell-bar"></div>
-      <div id="pist-fb" class="pist-shell-bar"></div>
 
       ${this._pistView==='bandeja' ? `
-        <div class="pist-shell-bar" style="padding:2px 0 8px;">
-          <input type="text" id="pist-scan" placeholder="Pistolea las series de corrido (de cualquier pedido) — caen a la bandeja y el sistema sugiere su SKU…" style="width:100%;font-family:monospace;font-size:14px;font-weight:600;padding:10px 12px;border:2px solid var(--accent);border-radius:9px;outline:none;background:var(--bg-input);color:var(--text);box-shadow:0 0 0 4px var(--accent-dim);" autofocus>
+        <div class="pist-shell-bar" style="padding:2px 0 6px;display:flex;align-items:center;gap:12px;">
+          <input type="text" id="pist-scan" placeholder="Pistolea las series de corrido (de cualquier pedido) — caen a la bandeja y el sistema sugiere su SKU…" style="flex:1;font-family:monospace;font-size:14px;font-weight:600;padding:9px 12px;border:2px solid var(--accent);border-radius:9px;outline:none;background:var(--bg-input);color:var(--text);box-shadow:0 0 0 4px var(--accent-dim);" autofocus>
+          <div id="pist-fb" style="min-width:260px;max-width:380px;"></div>
         </div>
         <div class="pist-split">
           <div class="pist-panel">
@@ -373,7 +364,8 @@ const IngresosView = {
           </div>
         </div>
       ` : `
-        <div class="pist-panel" style="flex:1;min-height:0;margin-bottom:8px;">
+        <div id="pist-fb" class="pist-shell-bar"></div>
+        <div class="pist-panel" style="flex:1;min-height:0;margin-bottom:6px;">
           <div class="pist-panel-head" style="flex-wrap:wrap;">
             <strong style="font-size:13px;">Ítems · ${escapeHtml(this._pistSelectedPedido||'')}</strong>
             <span style="font-size:11px;color:var(--text-tertiary);">Abre un SKU y pistolea sus series · Enter salta al siguiente</span>
