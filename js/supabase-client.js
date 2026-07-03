@@ -425,61 +425,29 @@ async function confirmarPicking(itemDespachoId, stockId, cantidadPickeada, obser
     return { error: errGet || new Error('Stock no encontrado') };
   }
 
-  const cantidadOriginal = Number(stockRow.cantidad) || 0;
-  const restante = Math.max(0, cantidadOriginal - Number(cantidadPickeada));
+  // Modelo: cantidad = lo fisico que sigue en el almacen (no baja aqui).
+  // cantidad_reservada = cuanto de esa cantidad ya esta comprometido con
+  // un pedido pickeado pero que aun no sale fisicamente ("el bulto puede
+  // salir otro dia"). stock real = cantidad - cantidad_reservada, se
+  // calcula, no se guarda. Todo vive en LA MISMA fila — sin filas nuevas.
+  const reservadaActual = Number(stockRow.cantidad_reservada) || 0;
+  const nuevaReservada = reservadaActual + Number(cantidadPickeada);
 
-  // stockIdMovimiento = la fila que va a quedar marcada RESERVADO/DESPACHADO
-  // (la porcion exacta que se pickeo para ESTE despacho, ni una unidad mas).
-  let stockIdMovimiento = stockId;
+  const { error: errUpdate } = await sb
+    .from('stock')
+    .update({
+      cantidad_reservada: nuevaReservada,
+      estado: 'RESERVADO',
+      actualizado_en: new Date().toISOString()
+    })
+    .eq('id', stockId);
 
-  if (restante > 0) {
-    // Pick PARCIAL de un lote (LOTIZADO/CABLE con cantidad>1): separamos la
-    // porcion pickeada en una fila nueva propia, y dejamos el remanente en
-    // la fila original DISPONIBLE. Antes esto marcaba TODO el lote como
-    // RESERVADO/DESPACHADO aunque solo se hubiera pickeado una parte —
-    // el remanente quedaba invisible para nuevos pedidos.
-    const { data: nuevaFila, error: errSplit } = await sb
-      .from('stock')
-      .insert([{
-        sku: stockRow.sku,
-        descripcion: stockRow.descripcion,
-        serie: stockRow.serie,
-        cantidad: 0,
-        unidad_medida: stockRow.unidad_medida,
-        paleta_pedido: stockRow.paleta_pedido,
-        ubicacion_fisica: stockRow.ubicacion_fisica,
-        cliente: stockRow.cliente,
-        tipo: stockRow.tipo,
-        estado: 'RESERVADO',
-        gr_ingreso: stockRow.gr_ingreso,
-        fecha_ingreso: stockRow.fecha_ingreso,
-        actualizado_en: new Date().toISOString()
-      }])
-      .select()
-      .single();
-
-    if (errSplit) return { error: errSplit };
-    stockIdMovimiento = nuevaFila.id;
-
-    const { error: errResto } = await sb
-      .from('stock')
-      .update({ cantidad: restante, estado: 'DISPONIBLE', actualizado_en: new Date().toISOString() })
-      .eq('id', stockId);
-    if (errResto) return { error: errResto };
-  } else {
-    // Se pickeo el lote completo (o es SERIADO, cantidad=1): la misma fila
-    // queda en 0, tal como antes.
-    const { error: errUpdate } = await sb
-      .from('stock')
-      .update({ cantidad: 0, actualizado_en: new Date().toISOString() })
-      .eq('id', stockId);
-    if (errUpdate) return { error: errUpdate };
-  }
+  if (errUpdate) return { error: errUpdate };
 
   const { error: errKardex } = await sb
     .from('kardex')
     .insert([{
-      stock_id: stockIdMovimiento,
+      stock_id: stockId,
       sku: stockRow.sku,
       descripcion: stockRow.descripcion,
       serie: stockRow.serie,
@@ -494,12 +462,12 @@ async function confirmarPicking(itemDespachoId, stockId, cantidadPickeada, obser
   const obsTexto = 'PICKEADO: ' + cantidadPickeada + (observacion ? ' | ' + observacion : '');
   const { error: errItem } = await sb
     .from('despachos_items')
-    .update({ observaciones: obsTexto, stock_id: stockIdMovimiento, cantidad_despachada: cantidadPickeada })
+    .update({ observaciones: obsTexto, stock_id: stockId, cantidad_despachada: cantidadPickeada })
     .eq('id', itemDespachoId);
 
   if (errItem) console.error('Error item despacho:', errItem);
 
-  return { error: null, nuevaCantidad: restante };
+  return { error: null, cantidadReservada: nuevaReservada };
 }
 
 // Paso 1 del cierre: todos los items ya se pickearon. La orden pasa
@@ -524,18 +492,37 @@ async function finalizarDespacho(despachoId) {
 
   const { data: items, error: errItems } = await sb
     .from('despachos_items')
-    .select('stock_id')
+    .select('stock_id, cantidad, cantidad_despachada')
     .eq('despacho_id', despachoId);
 
   if (!errItems && items && items.length > 0) {
-    const stockIds = items.map(it => it.stock_id).filter(Boolean);
-    if (stockIds.length > 0) {
+    for (const it of items) {
+      if (!it.stock_id) continue;
+      const cantSalio = Number(it.cantidad_despachada ?? it.cantidad ?? 0);
+      if (!cantSalio) continue;
+
+      const { data: row } = await sb
+        .from('stock')
+        .select('cantidad, cantidad_reservada')
+        .eq('id', it.stock_id)
+        .maybeSingle();
+      if (!row) continue;
+
+      // Aqui SI baja la cantidad fisica (el bulto ya salio de verdad) y
+      // se libera la reserva que se habia apartado en el picking.
+      const nuevaCant = Math.max(0, Number(row.cantidad) - cantSalio);
+      const nuevaReservada = Math.max(0, Number(row.cantidad_reservada) - cantSalio);
+
       const { error: errStock } = await sb
         .from('stock')
-        .update({ estado: 'DESPACHADO', actualizado_en: new Date().toISOString() })
-        .in('id', stockIds)
-        .eq('estado', 'RESERVADO');
-      if (errStock) console.error('Error al liberar stock a DESPACHADO:', errStock);
+        .update({
+          cantidad: nuevaCant,
+          cantidad_reservada: nuevaReservada,
+          estado: nuevaCant <= 0 ? 'DESPACHADO' : (nuevaReservada > 0 ? 'RESERVADO' : 'DISPONIBLE'),
+          actualizado_en: new Date().toISOString()
+        })
+        .eq('id', it.stock_id);
+      if (errStock) console.error('Error al liberar stock en finalizarDespacho:', errStock);
     }
   }
 
@@ -1079,42 +1066,56 @@ async function anularOrdenCompleta(despachoId) {
 
 // Revertir despacho — restaura stock y elimina el despacho
 async function revertirDespacho(despachoId) {
-  // Obtener ítems del despacho
+  // Necesitamos saber si el despacho ya llego a DESPACHADO (la cantidad
+  // fisica ya se descarto en finalizarDespacho) o si solo llego a
+  // PICKEADO/PENDIENTE (la cantidad fisica nunca bajo, solo se aparto en
+  // cantidad_reservada) — cada caso se revierte distinto.
+  const { data: despacho } = await sb.from('despachos').select('status').eq('id', despachoId).maybeSingle();
+  const yaDespachado = despacho?.status === 'DESPACHADO';
+
   const { data: items } = await sb.from('despachos_items')
     .select('*').eq('despacho_id', despachoId);
   if (!items?.length) {
-    // Solo eliminar el despacho si no tiene ítems
     await sb.from('despachos').delete().eq('id', despachoId);
     return { error: null };
   }
 
-  // Restaurar stock y registrar en kardex
   for (const it of items) {
     if (!it.stock_id) continue;
-    const cantRestaurar = it.cantidad_despachada || it.cantidad || 1;
+    const cantRestaurar = Number(it.cantidad_despachada || it.cantidad || 1);
 
-    // Obtener estado actual del stock
     const { data: stockRow } = await sb.from('stock')
-      .select('id, cantidad, serie, sku').eq('id', it.stock_id).maybeSingle();
+      .select('id, cantidad, cantidad_reservada, serie, sku').eq('id', it.stock_id).maybeSingle();
 
     if (stockRow) {
-      const nuevaCant = Number(stockRow.cantidad||0) + cantRestaurar;
+      const nuevaReservada = Math.max(0, Number(stockRow.cantidad_reservada||0) - cantRestaurar);
+      // Si ya habia salido fisicamente, se la devolvemos a cantidad.
+      // Si solo estaba reservada (nunca bajo de cantidad), no hay nada
+      // fisico que devolver — solo liberar la reserva.
+      const nuevaCant = yaDespachado ? Number(stockRow.cantidad||0) + cantRestaurar : Number(stockRow.cantidad||0);
+
       await sb.from('stock').update({
         cantidad: nuevaCant,
-        estado: 'DISPONIBLE',
+        cantidad_reservada: nuevaReservada,
+        estado: nuevaReservada > 0 ? 'RESERVADO' : 'DISPONIBLE',
         actualizado_en: new Date().toISOString()
       }).eq('id', it.stock_id);
 
-      // Registrar en kardex como INGRESO (reversión)
-      await sb.from('kardex').insert([{
-        stock_id: it.stock_id,
-        sku: it.sku || stockRow.sku,
-        tipo_movimiento: 'INGRESO',
-        cantidad: cantRestaurar,
-        referencia: `Reversión despacho #${despachoId}`,
-        observaciones: `Stock revertido. Serie: ${stockRow.serie||'—'}`,
-        fecha: new Date().toISOString(),
-      }]);
+      // Solo dejamos rastro de "ingreso por reversion" si de verdad habia
+      // salido fisicamente — si solo era una reserva, no hubo salida real.
+      if (yaDespachado) {
+        await sb.from('kardex').insert([{
+          stock_id: it.stock_id,
+          sku: it.sku || stockRow.sku,
+          descripcion: it.descripcion,
+          serie: stockRow.serie,
+          tipo_movimiento: 'INGRESO',
+          cantidad: cantRestaurar,
+          referencia: `Reversión despacho #${despachoId}`,
+          observaciones: `Stock revertido. Serie: ${stockRow.serie||'—'}`,
+          fecha: new Date().toISOString(),
+        }]);
+      }
     }
   }
 

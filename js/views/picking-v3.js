@@ -416,7 +416,7 @@ const PickingView = {
           <div style="font-size:11px; color:var(--text-secondary);">
             ${p.stock.paleta_pedido?`<strong>Pedido/Paleta:</strong> ${escapeHtml(p.stock.paleta_pedido)} &nbsp; `:''}
             ${p.stock.ubicacion_fisica?`<strong>Ubic.:</strong> ${escapeHtml(p.stock.ubicacion_fisica)} &nbsp; `:''}
-            <strong>Disp.:</strong> ${formatNum(p.stock.cantidad)}
+            <strong>Disp.:</strong> ${formatNum(Number(p.stock.cantidad) - Number(p.stock.cantidad_reservada||0))}
             ${p.stock.serie?` &nbsp; <strong>Serie:</strong> <span style="font-family:monospace;">${escapeHtml(p.stock.serie)}</span>`:''}
           </div>
         </div>
@@ -431,7 +431,7 @@ const PickingView = {
               <span class="pill ${alt.origen==='MUDANZA'?'pill-info':'pill-neutral'}" style="margin-right:6px;">${alt.origen==='MUDANZA'?'Mudanza':'Stock'}</span>
               ${escapeHtml(alt.stock.paleta_pedido||'-')}
               ${alt.stock.ubicacion_fisica?` · ${escapeHtml(alt.stock.ubicacion_fisica)}`:''}
-              · Cant: ${formatNum(alt.stock.cantidad)}
+              · Cant: ${formatNum(Number(alt.stock.cantidad) - Number(alt.stock.cantidad_reservada||0))}
             </div>
             <button class="btn-ghost" style="font-size:10px; padding:2px 8px; flex-shrink:0;"
               data-usar-alt="${idx}" data-alt-sid="${alt.stock.id}" data-alt-pp="${escapeHtml(alt.stock.paleta_pedido||'')}">
