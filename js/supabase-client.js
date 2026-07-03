@@ -425,20 +425,64 @@ async function confirmarPicking(itemDespachoId, stockId, cantidadPickeada, obser
     return { error: errGet || new Error('Stock no encontrado') };
   }
 
-  const nuevaCantidad = Math.max(0, Number(stockRow.cantidad) - Number(cantidadPickeada));
+  const cantidadOriginal = Number(stockRow.cantidad) || 0;
+  const restante = Math.max(0, cantidadOriginal - Number(cantidadPickeada));
 
-  const { error: errUpdate } = await sb
-    .from('stock')
-    .update({ cantidad: nuevaCantidad, actualizado_en: new Date().toISOString() })
-    .eq('id', stockId);
+  // stockIdMovimiento = la fila que va a quedar marcada RESERVADO/DESPACHADO
+  // (la porcion exacta que se pickeo para ESTE despacho, ni una unidad mas).
+  let stockIdMovimiento = stockId;
 
-  if (errUpdate) return { error: errUpdate };
+  if (restante > 0) {
+    // Pick PARCIAL de un lote (LOTIZADO/CABLE con cantidad>1): separamos la
+    // porcion pickeada en una fila nueva propia, y dejamos el remanente en
+    // la fila original DISPONIBLE. Antes esto marcaba TODO el lote como
+    // RESERVADO/DESPACHADO aunque solo se hubiera pickeado una parte —
+    // el remanente quedaba invisible para nuevos pedidos.
+    const { data: nuevaFila, error: errSplit } = await sb
+      .from('stock')
+      .insert([{
+        sku: stockRow.sku,
+        descripcion: stockRow.descripcion,
+        serie: stockRow.serie,
+        cantidad: 0,
+        unidad_medida: stockRow.unidad_medida,
+        paleta_pedido: stockRow.paleta_pedido,
+        ubicacion_fisica: stockRow.ubicacion_fisica,
+        cliente: stockRow.cliente,
+        tipo: stockRow.tipo,
+        estado: 'RESERVADO',
+        gr_ingreso: stockRow.gr_ingreso,
+        fecha_ingreso: stockRow.fecha_ingreso,
+        actualizado_en: new Date().toISOString()
+      }])
+      .select()
+      .single();
+
+    if (errSplit) return { error: errSplit };
+    stockIdMovimiento = nuevaFila.id;
+
+    const { error: errResto } = await sb
+      .from('stock')
+      .update({ cantidad: restante, estado: 'DISPONIBLE', actualizado_en: new Date().toISOString() })
+      .eq('id', stockId);
+    if (errResto) return { error: errResto };
+  } else {
+    // Se pickeo el lote completo (o es SERIADO, cantidad=1): la misma fila
+    // queda en 0, tal como antes.
+    const { error: errUpdate } = await sb
+      .from('stock')
+      .update({ cantidad: 0, actualizado_en: new Date().toISOString() })
+      .eq('id', stockId);
+    if (errUpdate) return { error: errUpdate };
+  }
 
   const { error: errKardex } = await sb
     .from('kardex')
     .insert([{
-      stock_id: stockId,
+      stock_id: stockIdMovimiento,
       sku: stockRow.sku,
+      descripcion: stockRow.descripcion,
+      serie: stockRow.serie,
       tipo_movimiento: 'SALIDA',
       cantidad: cantidadPickeada,
       referencia: 'Picking',
@@ -450,12 +494,12 @@ async function confirmarPicking(itemDespachoId, stockId, cantidadPickeada, obser
   const obsTexto = 'PICKEADO: ' + cantidadPickeada + (observacion ? ' | ' + observacion : '');
   const { error: errItem } = await sb
     .from('despachos_items')
-    .update({ observaciones: obsTexto })
+    .update({ observaciones: obsTexto, stock_id: stockIdMovimiento, cantidad_despachada: cantidadPickeada })
     .eq('id', itemDespachoId);
 
   if (errItem) console.error('Error item despacho:', errItem);
 
-  return { error: null, nuevaCantidad };
+  return { error: null, nuevaCantidad: restante };
 }
 
 // Paso 1 del cierre: todos los items ya se pickearon. La orden pasa
